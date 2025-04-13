@@ -9,9 +9,13 @@
 #include <pthread.h>
 #include <sys/types.h>
 #include <signal.h>
+#include <time.h>
 
 #define MAX_CLIENTS 100
 #define BUFFER_SZ 2048
+#define SPAM_LIMIT 5
+#define SPAM_INTERVAL 3  // seconds
+#define BLOCK_DURATION 15 // seconds
 
 static _Atomic unsigned int cli_count = 0;
 static int uid = 10;
@@ -21,6 +25,9 @@ typedef struct {
     int sockfd;
     int uid;
     char name[32];
+    time_t msg_times[SPAM_LIMIT];
+    int msg_index;
+    time_t block_until;
 } client_t;
 
 client_t *clients[MAX_CLIENTS];
@@ -108,18 +115,35 @@ void send_message(char *s, int uid){
     pthread_mutex_unlock(&clients_mutex);
 }
 
+int is_spamming(client_t *cli) {
+    time_t now = time(NULL);
+    cli->msg_times[cli->msg_index] = now;
+    cli->msg_index = (cli->msg_index + 1) % SPAM_LIMIT;
+
+    int oldest = cli->msg_index;
+    if (cli->msg_times[oldest] == 0) return 0;
+
+    if (difftime(now, cli->msg_times[oldest]) < SPAM_INTERVAL) {
+        cli->block_until = now + BLOCK_DURATION;
+        return 1;
+    }
+    return 0;
+}
+
 void *handle_client(void *arg){
     char buff_out[BUFFER_SZ];
     int leave_flag = 0;
 
     cli_count++;
     client_t *cli = (client_t *)arg;
+    memset(cli->msg_times, 0, sizeof(cli->msg_times));
+    cli->msg_index = 0;
+    cli->block_until = 0;
 
     char buffer[100];
     if (recv(cli->sockfd, buffer, sizeof(buffer), 0) <= 0) {
         leave_flag = 1;
     } else {
-        // Parse: action|username|password
         char *action = strtok(buffer, "|");
         char *username = strtok(NULL, "|");
         char *password = strtok(NULL, "|");
@@ -160,12 +184,35 @@ void *handle_client(void *arg){
     while(1){
         if (leave_flag) break;
 
+        time_t now = time(NULL);
+        if (cli->block_until > now) {
+            char *warn = "[Server] You are temporarily blocked due to spamming. Try again later.\n";
+            send(cli->sockfd, warn, strlen(warn), 0);
+            sleep(1);
+            continue;
+        }
+
         int receive = recv(cli->sockfd, buff_out, BUFFER_SZ, 0);
         if (receive > 0){
             if(strlen(buff_out) > 0){
-                send_message(buff_out, cli->uid);
                 str_trim_lf(buff_out, strlen(buff_out));
-                printf("%s -> %s\n", buff_out, cli->name);
+
+                if (is_spamming(cli)) {
+                    char *warn = "[Server] You have been blocked for 15 seconds due to spamming.\n";
+                    send(cli->sockfd, warn, strlen(warn), 0);
+                    continue;
+                }
+
+                time_t now = time(NULL);
+                struct tm *t = localtime(&now);
+                char time_str[64];
+                strftime(time_str, sizeof(time_str), "[%Y-%m-%d %H:%M:%S]", t);
+
+                char formatted_msg[BUFFER_SZ + 100];
+                snprintf(formatted_msg, sizeof(formatted_msg), "%s %s\n", time_str, buff_out);
+
+                send_message(formatted_msg, cli->uid);
+                printf("%s -> %s\n", formatted_msg, cli->name);
             }
         } else {
             sprintf(buff_out, "%s has left\n", cli->name);
@@ -191,7 +238,7 @@ int main(int argc, char **argv){
         return EXIT_FAILURE;
     }
 
-    char *ip = "0.0.0.0"; // cho phép mọi client kết nối
+    char *ip = "0.0.0.0";
     int port = atoi(argv[1]);
     int option = 1;
     int listenfd = 0, connfd = 0;
