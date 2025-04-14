@@ -14,8 +14,9 @@
 volatile sig_atomic_t flag = 0;
 int sockfd = 0;
 char name[32];
+int is_blocked = 0;
 
-void str_trim_lf (char* arr, int length) {
+void str_trim_lf(char* arr, int length) {
     for (int i = 0; i < length; i++) {
         if (arr[i] == '\n') {
             arr[i] = '\0';
@@ -25,8 +26,10 @@ void str_trim_lf (char* arr, int length) {
 }
 
 void str_overwrite_stdout() {
-    printf("> ");
-    fflush(stdout);
+    if (!is_blocked) {
+        printf("> ");
+        fflush(stdout);
+    }
 }
 
 void catch_ctrl_c_and_exit(int sig) {
@@ -37,10 +40,20 @@ void send_msg_handler() {
     char message[LENGTH] = {};
     char buffer[LENGTH + 32] = {};
 
-    while(1) {
+    while (1) {
+        if (is_blocked) {
+            usleep(100000); // Giảm tải CPU khi bị chặn
+            continue;
+        }
+
         str_overwrite_stdout();
         fgets(message, LENGTH, stdin);
         str_trim_lf(message, LENGTH);
+
+        // Bỏ qua tin nhắn rỗng
+        if (strlen(message) == 0) {
+            continue;
+        }
 
         if (strcmp(message, "exit") == 0) {
             break;
@@ -60,7 +73,16 @@ void recv_msg_handler() {
     while (1) {
         int receive = recv(sockfd, message, LENGTH, 0);
         if (receive > 0) {
-            printf("%s", message);
+            // Kiểm tra thông báo spam hoặc bỏ chặn
+            if (strstr(message, "Spam detected")) {
+                is_blocked = 1;
+                printf("\033[1;31m%s\033[0m", message); // In màu đỏ
+            } else if (strstr(message, "no longer blocked")) {
+                is_blocked = 0;
+                printf("\033[1;32m%s\033[0m", message); // In màu xanh
+            } else {
+                printf("%s", message);
+            }
             str_overwrite_stdout();
         } else if (receive == 0) {
             break;
@@ -69,8 +91,8 @@ void recv_msg_handler() {
     }
 }
 
-int main(int argc, char **argv){
-    if(argc != 3){
+int main(int argc, char **argv) {
+    if (argc != 3) {
         printf("Usage: %s <server_ip> <port>\n", argv[0]);
         return EXIT_FAILURE;
     }
@@ -123,19 +145,19 @@ int main(int argc, char **argv){
     printf("=== WELCOME TO THE CHATROOM ===\n");
 
     pthread_t send_msg_thread;
-    if(pthread_create(&send_msg_thread, NULL, (void *) send_msg_handler, NULL) != 0){
+    if (pthread_create(&send_msg_thread, NULL, (void *) send_msg_handler, NULL) != 0) {
         printf("ERROR: pthread\n");
         return EXIT_FAILURE;
     }
 
     pthread_t recv_msg_thread;
-    if(pthread_create(&recv_msg_thread, NULL, (void *) recv_msg_handler, NULL) != 0){
+    if (pthread_create(&recv_msg_thread, NULL, (void *) recv_msg_handler, NULL) != 0) {
         printf("ERROR: pthread\n");
         return EXIT_FAILURE;
     }
 
-    while (1){
-        if(flag){
+    while (1) {
+        if (flag) {
             printf("\nBye\n");
             break;
         }

@@ -10,12 +10,13 @@
 #include <sys/types.h>
 #include <signal.h>
 #include <time.h>
+#include <ctype.h>
 
 #define MAX_CLIENTS 100
 #define BUFFER_SZ 2048
-#define SPAM_LIMIT 5
-#define SPAM_INTERVAL 3  // seconds
-#define BLOCK_DURATION 15 // seconds
+#define SPAM_LIMIT 10         // Số tin nhắn tối đa trước khi báo spam
+#define SPAM_INTERVAL 8       // Thời gian (giây) để kiểm tra spam
+#define BLOCK_DURATION 15     // Thời gian chặn (giây)
 
 static _Atomic unsigned int cli_count = 0;
 static int uid = 10;
@@ -33,6 +34,7 @@ typedef struct {
 client_t *clients[MAX_CLIENTS];
 pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+// Hàm trim dòng mới
 void str_trim_lf(char* arr, int length) {
     for (int i = 0; i < length; i++) {
         if (arr[i] == '\n') {
@@ -42,6 +44,7 @@ void str_trim_lf(char* arr, int length) {
     }
 }
 
+// Kiểm tra thông tin đăng nhập
 int check_credentials(const char* username, const char* password) {
     FILE *fp = fopen("accounts.txt", "r");
     if (!fp) return 0;
@@ -56,6 +59,7 @@ int check_credentials(const char* username, const char* password) {
     return 0;
 }
 
+// Đăng ký người dùng
 int register_user(const char* username, const char* password) {
     FILE *fp_check = fopen("accounts.txt", "r");
     if (fp_check) {
@@ -76,10 +80,11 @@ int register_user(const char* username, const char* password) {
     return 1;
 }
 
-void queue_add(client_t *cl){
+// Thêm client vào hàng đợi
+void queue_add(client_t *cl) {
     pthread_mutex_lock(&clients_mutex);
-    for(int i=0; i < MAX_CLIENTS; ++i){
-        if(!clients[i]){
+    for (int i = 0; i < MAX_CLIENTS; ++i) {
+        if (!clients[i]) {
             clients[i] = cl;
             break;
         }
@@ -87,11 +92,12 @@ void queue_add(client_t *cl){
     pthread_mutex_unlock(&clients_mutex);
 }
 
-void queue_remove(int uid){
+// Xóa client khỏi hàng đợi
+void queue_remove(int uid) {
     pthread_mutex_lock(&clients_mutex);
-    for(int i=0; i < MAX_CLIENTS; ++i){
-        if(clients[i]){
-            if(clients[i]->uid == uid){
+    for (int i = 0; i < MAX_CLIENTS; ++i) {
+        if (clients[i]) {
+            if (clients[i]->uid == uid) {
                 clients[i] = NULL;
                 break;
             }
@@ -100,12 +106,13 @@ void queue_remove(int uid){
     pthread_mutex_unlock(&clients_mutex);
 }
 
-void send_message(char *s, int uid){
+// Gửi tin nhắn tới tất cả client trừ người gửi
+void send_message(char *s, int uid) {
     pthread_mutex_lock(&clients_mutex);
-    for(int i=0; i<MAX_CLIENTS; ++i){
-        if(clients[i]){
-            if(clients[i]->uid != uid){
-                if(write(clients[i]->sockfd, s, strlen(s)) < 0){
+    for (int i = 0; i < MAX_CLIENTS; ++i) {
+        if (clients[i]) {
+            if (clients[i]->uid != uid) {
+                if (write(clients[i]->sockfd, s, strlen(s)) < 0) {
                     perror("ERROR: write to descriptor failed");
                     break;
                 }
@@ -115,22 +122,46 @@ void send_message(char *s, int uid){
     pthread_mutex_unlock(&clients_mutex);
 }
 
+// Kiểm tra spam
 int is_spamming(client_t *cli) {
     time_t now = time(NULL);
+
+    // Ghi thời gian tin nhắn mới
     cli->msg_times[cli->msg_index] = now;
     cli->msg_index = (cli->msg_index + 1) % SPAM_LIMIT;
 
-    int oldest = cli->msg_index;
-    if (cli->msg_times[oldest] == 0) return 0;
+    // Đếm số tin nhắn hợp lệ
+    int valid_msgs = 0;
+    for (int i = 0; i < SPAM_LIMIT; i++) {
+        if (cli->msg_times[i] != 0) {
+            valid_msgs++;
+        }
+    }
 
-    if (difftime(now, cli->msg_times[oldest]) < SPAM_INTERVAL) {
+    // Chỉ kiểm tra spam nếu đã đủ 10 tin nhắn
+    if (valid_msgs < SPAM_LIMIT) {
+        return 0;
+    }
+
+    // Tìm thời gian tin nhắn cũ nhất
+    time_t oldest_time = now;
+    for (int i = 0; i < SPAM_LIMIT; i++) {
+        if (cli->msg_times[i] != 0 && cli->msg_times[i] < oldest_time) {
+            oldest_time = cli->msg_times[i];
+        }
+    }
+
+    // Kiểm tra nếu 10 tin nhắn được gửi trong SPAM_INTERVAL giây
+    if (difftime(now, oldest_time) <= SPAM_INTERVAL) {
         cli->block_until = now + BLOCK_DURATION;
         return 1;
     }
+
     return 0;
 }
 
-void *handle_client(void *arg){
+// Xử lý client
+void *handle_client(void *arg) {
     char buff_out[BUFFER_SZ];
     int leave_flag = 0;
 
@@ -140,6 +171,7 @@ void *handle_client(void *arg){
     cli->msg_index = 0;
     cli->block_until = 0;
 
+    // Xử lý đăng nhập/đăng ký
     char buffer[100];
     if (recv(cli->sockfd, buffer, sizeof(buffer), 0) <= 0) {
         leave_flag = 1;
@@ -181,25 +213,35 @@ void *handle_client(void *arg){
 
     bzero(buff_out, BUFFER_SZ);
 
-    while(1){
+    while (1) {
         if (leave_flag) break;
 
         time_t now = time(NULL);
+
+        // Kiểm tra nếu client đang bị chặn
         if (cli->block_until > now) {
-            char *warn = "[Server] You are temporarily blocked due to spamming. Try again later.\n";
-            send(cli->sockfd, warn, strlen(warn), 0);
-            sleep(1);
+            usleep(100000); // Giảm tải CPU
             continue;
         }
 
+        // Kiểm tra nếu vừa hết thời gian chặn
+        if (cli->block_until != 0 && cli->block_until <= now) {
+            char *unblock_msg = "[Server] You are no longer blocked. You can send messages now.\n";
+            send(cli->sockfd, unblock_msg, strlen(unblock_msg), 0);
+            cli->block_until = 0;
+            memset(cli->msg_times, 0, sizeof(cli->msg_times)); // Đặt lại lịch sử tin nhắn
+            cli->msg_index = 0;
+        }
+
         int receive = recv(cli->sockfd, buff_out, BUFFER_SZ, 0);
-        if (receive > 0){
-            if(strlen(buff_out) > 0){
+        if (receive > 0) {
+            if (strlen(buff_out) > 0) {
                 str_trim_lf(buff_out, strlen(buff_out));
 
+                // Ghi nhận mọi tin nhắn, kể cả ngắn hay dài
                 if (is_spamming(cli)) {
-                    char *warn = "[Server] You have been blocked for 15 seconds due to spamming.\n";
-                    send(cli->sockfd, warn, strlen(warn), 0);
+                    char *spam_warn = "[Server] Spam detected! You are blocked for 15 seconds.\n";
+                    send(cli->sockfd, spam_warn, strlen(spam_warn), 0);
                     continue;
                 }
 
@@ -214,10 +256,13 @@ void *handle_client(void *arg){
                 send_message(formatted_msg, cli->uid);
                 printf("%s -> %s\n", formatted_msg, cli->name);
             }
-        } else {
+        } else if (receive == 0 || strcmp(buff_out, "exit") == 0) {
             sprintf(buff_out, "%s has left\n", cli->name);
             printf("%s", buff_out);
             send_message(buff_out, cli->uid);
+            leave_flag = 1;
+        } else {
+            printf("ERROR: -1\n");
             leave_flag = 1;
         }
         bzero(buff_out, BUFFER_SZ);
@@ -232,8 +277,8 @@ void *handle_client(void *arg){
     return NULL;
 }
 
-int main(int argc, char **argv){
-    if(argc != 2){
+int main(int argc, char **argv) {
+    if (argc != 2) {
         printf("Usage: %s <port>\n", argv[0]);
         return EXIT_FAILURE;
     }
@@ -251,12 +296,12 @@ int main(int argc, char **argv){
     serv_addr.sin_addr.s_addr = inet_addr(ip);
     serv_addr.sin_port = htons(port);
 
-    if(setsockopt(listenfd, SOL_SOCKET,(SO_REUSEPORT | SO_REUSEADDR), (char*)&option, sizeof(option)) < 0){
+    if (setsockopt(listenfd, SOL_SOCKET, (SO_REUSEPORT | SO_REUSEADDR), (char*)&option, sizeof(option)) < 0) {
         perror("ERROR: setsockopt failed");
         return EXIT_FAILURE;
     }
 
-    if(bind(listenfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
+    if (bind(listenfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
         perror("ERROR: Socket binding failed");
         return EXIT_FAILURE;
     }
@@ -268,11 +313,11 @@ int main(int argc, char **argv){
 
     printf("=== CHATROOM SERVER STARTED ===\n");
 
-    while(1){
+    while (1) {
         socklen_t clilen = sizeof(cli_addr);
         connfd = accept(listenfd, (struct sockaddr*)&cli_addr, &clilen);
 
-        if((cli_count + 1) == MAX_CLIENTS){
+        if ((cli_count + 1) == MAX_CLIENTS) {
             printf("Max clients reached. Rejecting...\n");
             close(connfd);
             continue;
