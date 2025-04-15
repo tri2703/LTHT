@@ -14,9 +14,10 @@
 
 #define MAX_CLIENTS 100
 #define BUFFER_SZ 2048
-#define SPAM_LIMIT 10         // Số tin nhắn tối đa trước khi báo spam
-#define SPAM_INTERVAL 8       // Thời gian (giây) để kiểm tra spam
-#define BLOCK_DURATION 15     // Thời gian chặn (giây)
+#define SPAM_LIMIT 10
+#define SPAM_INTERVAL 8
+#define BLOCK_DURATION 15
+#define HISTORY_FILE "history.txt"
 
 static _Atomic unsigned int cli_count = 0;
 static int uid = 10;
@@ -34,7 +35,6 @@ typedef struct {
 client_t *clients[MAX_CLIENTS];
 pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-// Hàm trim dòng mới
 void str_trim_lf(char* arr, int length) {
     for (int i = 0; i < length; i++) {
         if (arr[i] == '\n') {
@@ -44,7 +44,6 @@ void str_trim_lf(char* arr, int length) {
     }
 }
 
-// Kiểm tra thông tin đăng nhập
 int check_credentials(const char* username, const char* password) {
     FILE *fp = fopen("accounts.txt", "r");
     if (!fp) return 0;
@@ -59,7 +58,6 @@ int check_credentials(const char* username, const char* password) {
     return 0;
 }
 
-// Đăng ký người dùng
 int register_user(const char* username, const char* password) {
     FILE *fp_check = fopen("accounts.txt", "r");
     if (fp_check) {
@@ -80,7 +78,6 @@ int register_user(const char* username, const char* password) {
     return 1;
 }
 
-// Thêm client vào hàng đợi
 void queue_add(client_t *cl) {
     pthread_mutex_lock(&clients_mutex);
     for (int i = 0; i < MAX_CLIENTS; ++i) {
@@ -92,7 +89,6 @@ void queue_add(client_t *cl) {
     pthread_mutex_unlock(&clients_mutex);
 }
 
-// Xóa client khỏi hàng đợi
 void queue_remove(int uid) {
     pthread_mutex_lock(&clients_mutex);
     for (int i = 0; i < MAX_CLIENTS; ++i) {
@@ -106,61 +102,65 @@ void queue_remove(int uid) {
     pthread_mutex_unlock(&clients_mutex);
 }
 
-// Gửi tin nhắn tới tất cả client trừ người gửi
 void send_message(char *s, int uid) {
     pthread_mutex_lock(&clients_mutex);
     for (int i = 0; i < MAX_CLIENTS; ++i) {
-        if (clients[i]) {
-            if (clients[i]->uid != uid) {
-                if (write(clients[i]->sockfd, s, strlen(s)) < 0) {
-                    perror("ERROR: write to descriptor failed");
-                    break;
-                }
+        if (clients[i] && clients[i]->uid != uid) {
+            if (write(clients[i]->sockfd, s, strlen(s)) < 0) {
+                perror("ERROR: write to descriptor failed");
+                break;
             }
         }
     }
     pthread_mutex_unlock(&clients_mutex);
 }
 
-// Kiểm tra spam
 int is_spamming(client_t *cli) {
     time_t now = time(NULL);
-
-    // Ghi thời gian tin nhắn mới
     cli->msg_times[cli->msg_index] = now;
     cli->msg_index = (cli->msg_index + 1) % SPAM_LIMIT;
 
-    // Đếm số tin nhắn hợp lệ
     int valid_msgs = 0;
     for (int i = 0; i < SPAM_LIMIT; i++) {
-        if (cli->msg_times[i] != 0) {
-            valid_msgs++;
-        }
+        if (cli->msg_times[i] != 0) valid_msgs++;
     }
+    if (valid_msgs < SPAM_LIMIT) return 0;
 
-    // Chỉ kiểm tra spam nếu đã đủ 10 tin nhắn
-    if (valid_msgs < SPAM_LIMIT) {
-        return 0;
-    }
-
-    // Tìm thời gian tin nhắn cũ nhất
     time_t oldest_time = now;
     for (int i = 0; i < SPAM_LIMIT; i++) {
         if (cli->msg_times[i] != 0 && cli->msg_times[i] < oldest_time) {
             oldest_time = cli->msg_times[i];
         }
     }
-
-    // Kiểm tra nếu 10 tin nhắn được gửi trong SPAM_INTERVAL giây
     if (difftime(now, oldest_time) <= SPAM_INTERVAL) {
         cli->block_until = now + BLOCK_DURATION;
         return 1;
     }
-
     return 0;
 }
 
-// Xử lý client
+void save_message_to_history(const char *message) {
+    FILE *fp = fopen(HISTORY_FILE, "a");
+    if (fp) {
+        fprintf(fp, "%s", message);
+        fclose(fp);
+    }
+}
+
+void send_history_to_client(int sockfd) {
+    FILE *fp = fopen(HISTORY_FILE, "r");
+    if (fp) {
+        char line[BUFFER_SZ + 100];
+        while (fgets(line, sizeof(line), fp)) {
+            if (send(sockfd, line, strlen(line), 0) <= 0) {
+                perror("[ERROR] Failed to send history");
+                break;
+            }
+        }
+        fclose(fp);
+    }
+}
+
 void *handle_client(void *arg) {
     char buff_out[BUFFER_SZ];
     int leave_flag = 0;
@@ -171,7 +171,6 @@ void *handle_client(void *arg) {
     cli->msg_index = 0;
     cli->block_until = 0;
 
-    // Xử lý đăng nhập/đăng ký
     char buffer[100];
     if (recv(cli->sockfd, buffer, sizeof(buffer), 0) <= 0) {
         leave_flag = 1;
@@ -186,7 +185,9 @@ void *handle_client(void *arg) {
         } else if (strcmp(action, "login") == 0) {
             if (check_credentials(username, password)) {
                 strcpy(cli->name, username);
-                send(cli->sockfd, "OK", 2, 0);
+                send(cli->sockfd, "OK\n", 3, 0);
+                usleep(100000);
+                send_history_to_client(cli->sockfd);
                 sprintf(buff_out, "%s has joined\n", cli->name);
                 printf("%s", buff_out);
                 send_message(buff_out, cli->uid);
@@ -197,7 +198,7 @@ void *handle_client(void *arg) {
         } else if (strcmp(action, "register") == 0) {
             if (register_user(username, password)) {
                 strcpy(cli->name, username);
-                send(cli->sockfd, "OK", 2, 0);
+                send(cli->sockfd, "OK\n", 3, 0);
                 sprintf(buff_out, "%s has registered and joined\n", cli->name);
                 printf("%s", buff_out);
                 send_message(buff_out, cli->uid);
@@ -218,18 +219,16 @@ void *handle_client(void *arg) {
 
         time_t now = time(NULL);
 
-        // Kiểm tra nếu client đang bị chặn
         if (cli->block_until > now) {
-            usleep(100000); // Giảm tải CPU
+            usleep(100000);
             continue;
         }
 
-        // Kiểm tra nếu vừa hết thời gian chặn
         if (cli->block_until != 0 && cli->block_until <= now) {
             char *unblock_msg = "[Server] You are no longer blocked. You can send messages now.\n";
             send(cli->sockfd, unblock_msg, strlen(unblock_msg), 0);
             cli->block_until = 0;
-            memset(cli->msg_times, 0, sizeof(cli->msg_times)); // Đặt lại lịch sử tin nhắn
+            memset(cli->msg_times, 0, sizeof(cli->msg_times));
             cli->msg_index = 0;
         }
 
@@ -238,7 +237,6 @@ void *handle_client(void *arg) {
             if (strlen(buff_out) > 0) {
                 str_trim_lf(buff_out, strlen(buff_out));
 
-                // Ghi nhận mọi tin nhắn, kể cả ngắn hay dài
                 if (is_spamming(cli)) {
                     char *spam_warn = "[Server] Spam detected! You are blocked for 15 seconds.\n";
                     send(cli->sockfd, spam_warn, strlen(spam_warn), 0);
@@ -254,6 +252,7 @@ void *handle_client(void *arg) {
                 snprintf(formatted_msg, sizeof(formatted_msg), "%s %s\n", time_str, buff_out);
 
                 send_message(formatted_msg, cli->uid);
+                save_message_to_history(formatted_msg);
                 printf("%s -> %s\n", formatted_msg, cli->name);
             }
         } else if (receive == 0 || strcmp(buff_out, "exit") == 0) {
@@ -273,7 +272,6 @@ void *handle_client(void *arg) {
     free(cli);
     cli_count--;
     pthread_detach(pthread_self());
-
     return NULL;
 }
 

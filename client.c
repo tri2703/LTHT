@@ -42,7 +42,7 @@ void send_msg_handler() {
 
     while (1) {
         if (is_blocked) {
-            usleep(100000); // Giảm tải CPU khi bị chặn
+            usleep(100000);
             continue;
         }
 
@@ -50,7 +50,6 @@ void send_msg_handler() {
         fgets(message, LENGTH, stdin);
         str_trim_lf(message, LENGTH);
 
-        // Bỏ qua tin nhắn rỗng
         if (strlen(message) == 0) {
             continue;
         }
@@ -58,7 +57,7 @@ void send_msg_handler() {
         if (strcmp(message, "exit") == 0) {
             break;
         } else {
-            sprintf(buffer, "%s: %s\n", name, message);
+            snprintf(buffer, sizeof(buffer), "%s: %s\n", name, message);
             send(sockfd, buffer, strlen(buffer), 0);
         }
 
@@ -71,18 +70,20 @@ void send_msg_handler() {
 void recv_msg_handler() {
     char message[LENGTH] = {};
     while (1) {
-        int receive = recv(sockfd, message, LENGTH, 0);
+        int receive = recv(sockfd, message, LENGTH - 1, 0);
         if (receive > 0) {
-            // Kiểm tra thông báo spam hoặc bỏ chặn
+            message[receive] = '\0';
+
             if (strstr(message, "Spam detected")) {
                 is_blocked = 1;
-                printf("\033[1;31m%s\033[0m", message); // In màu đỏ
+                printf("\033[1;31m%s\033[0m", message);
             } else if (strstr(message, "no longer blocked")) {
                 is_blocked = 0;
-                printf("\033[1;32m%s\033[0m", message); // In màu xanh
+                printf("\033[1;32m%s\033[0m", message);
             } else {
                 printf("%s", message);
             }
+
             str_overwrite_stdout();
         } else if (receive == 0) {
             break;
@@ -124,18 +125,33 @@ int main(int argc, char **argv) {
 
     int err = connect(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr));
     if (err == -1) {
-        printf("ERROR: connect\n");
+        perror("ERROR: connect");
         return EXIT_FAILURE;
     }
 
     char auth_message[100];
-    sprintf(auth_message, "%s|%s|%s", action, name, password);
+    snprintf(auth_message, sizeof(auth_message), "%s|%s|%s", action, name, password);
     send(sockfd, auth_message, strlen(auth_message), 0);
 
-    char auth_response[100];
-    int bytes = recv(sockfd, auth_response, sizeof(auth_response), 0);
+    char auth_response[LENGTH];
+    int bytes = recv(sockfd, auth_response, sizeof(auth_response) - 1, 0);
+    if (bytes <= 0) {
+        printf("Disconnected or failed to receive response.\n");
+        close(sockfd);
+        return EXIT_FAILURE;
+    }
+
     auth_response[bytes] = '\0';
-    printf("%s\n", auth_response);
+
+    // Xử lý OK + lịch sử nếu có
+    char *newline = strchr(auth_response, '\n');
+    if (newline) {
+        *newline = '\0';
+        printf("%s\n", auth_response);       // In "OK"
+        printf("%s\n", newline + 1);         // In phần lịch sử đầu tiên
+    } else {
+        printf("%s\n", auth_response);
+    }
 
     if (strcmp(auth_response, "OK") != 0) {
         close(sockfd);
