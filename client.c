@@ -103,10 +103,22 @@ int main(int argc, char **argv) {
 
     signal(SIGINT, catch_ctrl_c_and_exit);
 
-    printf("Do you want to [login] or [register]? ");
     char action[10];
-    fgets(action, sizeof(action), stdin);
-    str_trim_lf(action, sizeof(action));
+    int choice = 0;
+
+    while (choice != 1 && choice != 2) {
+     printf("Select an action:\n");
+     printf("  1. Login\n");
+     printf("  2. Register\n");
+     printf("Your choice: ");
+     fgets(action, sizeof(action), stdin);
+     choice = atoi(action);
+     if (choice != 1 && choice != 2) {
+        printf("Invalid option. Please enter 1 or 2.\n");
+     }
+    }
+
+strcpy(action, (choice == 1) ? "login" : "register");
 
     printf("Username: ");
     fgets(name, 32, stdin);
