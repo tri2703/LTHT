@@ -50,20 +50,29 @@ void send_msg_handler() {
         fgets(message, LENGTH, stdin);
         str_trim_lf(message, LENGTH);
 
-        if (strlen(message) == 0) {
+        if (strlen(message) == 0) continue;
+
+        // xử lý exit
+        if (strcmp(message, "exit") == 0) break;
+
+        // xử lý lệnh local
+        if (strcmp(message, "/help") == 0) {
+            printf("Available commands:\n");
+            printf("  /create <room> <user1> <user2> ... : Create private room\n");
+            printf("  /join <room>                     : Join a private room\n");
+            printf("  /leave                           : Leave current room\n");
+            printf("  exit                             : Quit chat\n");
             continue;
         }
 
-        if (strcmp(message, "exit") == 0) {
-            break;
-        } else {
-            snprintf(buffer, sizeof(buffer), "%s: %s\n", name, message);
-            send(sockfd, buffer, strlen(buffer), 0);
-        }
+        // Gửi lệnh hoặc tin nhắn đến server
+        snprintf(buffer, sizeof(buffer), "%s", message);
+        send(sockfd, buffer, strlen(buffer), 0);
 
         bzero(message, LENGTH);
         bzero(buffer, LENGTH + 32);
     }
+
     catch_ctrl_c_and_exit(2);
 }
 
@@ -107,18 +116,18 @@ int main(int argc, char **argv) {
     int choice = 0;
 
     while (choice != 1 && choice != 2) {
-     printf("Select an action:\n");
-     printf("  1. Login\n");
-     printf("  2. Register\n");
-     printf("Your choice: ");
-     fgets(action, sizeof(action), stdin);
-     choice = atoi(action);
-     if (choice != 1 && choice != 2) {
-        printf("Invalid option. Please enter 1 or 2.\n");
-     }
+        printf("Select an action:\n");
+        printf("  1. Login\n");
+        printf("  2. Register\n");
+        printf("Your choice: ");
+        fgets(action, sizeof(action), stdin);
+        choice = atoi(action);
+        if (choice != 1 && choice != 2) {
+            printf("Invalid option. Please enter 1 or 2.\n");
+        }
     }
 
-strcpy(action, (choice == 1) ? "login" : "register");
+    strcpy(action, (choice == 1) ? "login" : "register");
 
     printf("Username: ");
     fgets(name, 32, stdin);
@@ -155,12 +164,11 @@ strcpy(action, (choice == 1) ? "login" : "register");
 
     auth_response[bytes] = '\0';
 
-    // Xử lý OK + lịch sử nếu có
     char *newline = strchr(auth_response, '\n');
     if (newline) {
         *newline = '\0';
-        printf("%s\n", auth_response);       // In "OK"
-        printf("%s\n", newline + 1);         // In phần lịch sử đầu tiên
+        printf("%s\n", auth_response);
+        printf("%s\n", newline + 1);
     } else {
         printf("%s\n", auth_response);
     }
@@ -171,6 +179,7 @@ strcpy(action, (choice == 1) ? "login" : "register");
     }
 
     printf("=== WELCOME TO THE CHATROOM ===\n");
+    printf("Type /help to see available commands.\n");
 
     pthread_t send_msg_thread;
     if (pthread_create(&send_msg_thread, NULL, (void *) send_msg_handler, NULL) != 0) {
