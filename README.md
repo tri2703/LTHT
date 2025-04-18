@@ -1,4 +1,6 @@
 # LTHT
 
 
-gchgikhjhh
+- Login & Register.
+- History Chat.
+- Block Spam.
