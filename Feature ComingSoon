@@ -1,0 +1,24 @@
+1. Phòng chat riêng (Private Rooms):
+   - Mô tả: Cho phép người dùng tạo các phòng chat riêng với mật khẩu hoặc danh sách người được mời. Chỉ những người có quyền mới tham gia được.
+   - Lợi ích: Tăng tính riêng tư, phù hợp cho nhóm bạn bè hoặc cuộc họp nội bộ.
+#2. Nhắn tin riêng (Private Messaging):
+   - Mô tả: Cho phép người dùng gửi tin nhắn trực tiếp đến một người dùng cụ thể thay vì toàn phòng.
+   - Lợi ích: Tăng tính linh hoạt, hỗ trợ giao tiếp cá nhân.
+3. Thông báo trạng thái người dùng (Online/Offline Status):
+   - Mô tả: Hiển thị danh sách người dùng đang online và thông báo khi có người tham gia/rời khỏi chatroom.
+   - Lợi ích: Giúp người dùng biết ai đang hoạt động.
+4. Hỗ trợ định dạng tin nhắn (Rich Text/Emoji):
+   - Mô tả: Cho phép gửi tin nhắn với định dạng như in đậm, nghiêng, hoặc emoji.
+   - Lợi ích: Tăng trải nghiệm người dùng, làm giao diện sinh động hơn.
+#5. Hệ thống quản lý người dùng (Admin/Moderator):
+   - Mô tả: Thêm vai trò admin hoặc moderator để quản lý chatroom, như kick/ban người dùng hoặc bật/tắt chế độ spam.
+   - Lợi ích: Giúp kiểm soát hành vi người dùng, giảm spam.
+6. Gửi file hoặc hình ảnh:
+   - Mô tả: Cho phép người dùng gửi file nhỏ hoặc hình ảnh qua chatroom.
+   - Lợi ích: Hỗ trợ chia sẻ tài liệu hoặc nội dung đa phương tiện.
+#7. Thông báo đẩy (Notifications):
+   - Mô tả: Gửi thông báo khi có tin nhắn mới, đặc biệt khi người dùng bị tag (ví dụ: `@username`).
+   - Lợi ích: Thu hút sự chú ý của người dùng được nhắc đến.
+8. Chặn người dùng (Block User):
+   - Mô tả: Cho phép người dùng chặn tin nhắn từ một người dùng cụ thể, ngăn họ nhận tin nhắn công khai hoặc riêng tư từ người bị chặn.
+   - Lợi ích: Tăng quyền kiểm soát của người dùng, giảm quấy rối.
