@@ -52,20 +52,21 @@ void send_msg_handler() {
 
         if (strlen(message) == 0) continue;
 
-        // xử lý exit
+        // Handle exit
         if (strcmp(message, "exit") == 0) break;
 
-        // xử lý lệnh local
+        // Handle local commands
         if (strcmp(message, "/help") == 0) {
             printf("Available commands:\n");
             printf("  /create <room> <user1> <user2> ... : Create private room\n");
             printf("  /join <room>                     : Join a private room\n");
             printf("  /leave                           : Leave current room\n");
+            printf("  /rooms                           : List available rooms\n");
             printf("  exit                             : Quit chat\n");
             continue;
         }
 
-        // Gửi lệnh hoặc tin nhắn đến server
+        // Send command or message to server
         snprintf(buffer, sizeof(buffer), "%s", message);
         send(sockfd, buffer, strlen(buffer), 0);
 
@@ -78,10 +79,21 @@ void send_msg_handler() {
 
 void recv_msg_handler() {
     char message[LENGTH] = {};
+    FILE *log_file = fopen("client_log.txt", "a");
+    if (!log_file) {
+        perror("Failed to open client_log.txt");
+    }
+
     while (1) {
         int receive = recv(sockfd, message, LENGTH - 1, 0);
         if (receive > 0) {
             message[receive] = '\0';
+
+            // Log received message
+            if (log_file) {
+                fprintf(log_file, "Received: %s", message);
+                fflush(log_file);
+            }
 
             if (strstr(message, "Spam detected")) {
                 is_blocked = 1;
@@ -92,13 +104,15 @@ void recv_msg_handler() {
             } else {
                 printf("%s", message);
             }
-
+            fflush(stdout); // Ensure message is displayed immediately
             str_overwrite_stdout();
         } else if (receive == 0) {
             break;
         }
         memset(message, 0, sizeof(message));
     }
+
+    if (log_file) fclose(log_file);
 }
 
 int main(int argc, char **argv) {
