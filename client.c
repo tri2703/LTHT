@@ -36,6 +36,61 @@ void catch_ctrl_c_and_exit(int sig) {
     flag = 1;
 }
 
+// Hàm xử lý định dạng tin nhắn và emoji
+void format_message(char *input, char *output, int max_len) {
+    char *pos = input;
+    char *out = output;
+    int out_len = 0;
+
+    while (*pos && out_len < max_len - 10) {
+        if (*pos == '*' && *(pos + 1) != '*' && *(pos + 1) != '\0') {
+            // Bắt đầu in đậm
+            if (strncmp(pos, "*text*", 6) != 0) {
+                strcpy(out + out_len, "\033[1m");
+                out_len += strlen("\033[1m");
+                pos++;
+                while (*pos != '*' && *pos && out_len < max_len - 10) {
+                    out[out_len++] = *pos++;
+                }
+                if (*pos == '*') {
+                    strcpy(out + out_len, "\033[0m");
+                    out_len += strlen("\033[0m");
+                    pos++;
+                }
+                continue;
+            }
+        } else if (*pos == '_' && *(pos + 1) != '_' && *(pos + 1) != '\0') {
+            // Bắt đầu in nghiêng
+            strcpy(out + out_len, "\033[3m");
+            out_len += strlen("\033[3m");
+            pos++;
+            while (*pos != '_' && *pos && out_len < max_len - 10) {
+                out[out_len++] = *pos++;
+            }
+            if (*pos == '_') {
+                strcpy(out + out_len, "\033[0m");
+                out_len += strlen("\033[0m");
+                pos++;
+            }
+            continue;
+        } else if (*pos == ':' && strncmp(pos, ":smile:", 7) == 0) {
+            // Emoji smile
+            strcpy(out + out_len, "😊");
+            out_len += strlen("😊");
+            pos += 7;
+            continue;
+        } else if (*pos == ':' && strncmp(pos, ":heart:", 7) == 0) {
+            // Emoji heart
+            strcpy(out + out_len, "❤️");
+            out_len += strlen("❤️");
+            pos += 7;
+            continue;
+        }
+        out[out_len++] = *pos++;
+    }
+    out[out_len] = '\0';
+}
+
 void send_msg_handler() {
     char message[LENGTH] = {};
     char buffer[LENGTH + 32] = {};
@@ -62,7 +117,13 @@ void send_msg_handler() {
             printf("  /join <room>                     : Join a private room\n");
             printf("  /leave                           : Leave current room\n");
             printf("  /rooms                           : List available rooms\n");
+            printf("  /online                          : List online users\n");
             printf("  exit                             : Quit chat\n");
+            printf("Formatting:\n");
+            printf("  *text*                           : Bold text\n");
+            printf("  _text_                           : Italic text\n");
+            printf("  :smile:                          : Smile emoji 😊\n");
+            printf("  :heart:                          : Heart emoji ❤️\n");
             continue;
         }
 
@@ -79,6 +140,7 @@ void send_msg_handler() {
 
 void recv_msg_handler() {
     char message[LENGTH] = {};
+    char formatted_message[LENGTH + 100] = {};
     FILE *log_file = fopen("client_log.txt", "a");
     if (!log_file) {
         perror("Failed to open client_log.txt");
@@ -102,7 +164,9 @@ void recv_msg_handler() {
                 is_blocked = 0;
                 printf("\033[1;32m%s\033[0m", message);
             } else {
-                printf("%s", message);
+                // Xử lý định dạng tin nhắn
+                format_message(message, formatted_message, LENGTH + 100);
+                printf("%s", formatted_message);
             }
             fflush(stdout); // Ensure message is displayed immediately
             str_overwrite_stdout();
@@ -110,6 +174,7 @@ void recv_msg_handler() {
             break;
         }
         memset(message, 0, sizeof(message));
+        memset(formatted_message, 0, sizeof(formatted_message));
     }
 
     if (log_file) fclose(log_file);

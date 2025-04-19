@@ -146,11 +146,47 @@ void send_message(char *s, int uid) {
 
     for (int i = 0; i < MAX_CLIENTS; ++i) {
         if (clients[i] && clients[i]->uid != uid) {
+            // Gửi tin nhắn chỉ đến client trong cùng phòng (công cộng hoặc riêng)
             if (strcmp(clients[i]->current_room, sender->current_room) == 0) {
                 if (write(clients[i]->sockfd, s, strlen(s)) < 0) {
                     perror("ERROR: write failed");
                     break;
                 }
+            }
+        }
+    }
+    pthread_mutex_unlock(&clients_mutex);
+}
+
+// Hàm gửi danh sách người dùng online đến một client
+void send_online_users(int sockfd) {
+    char user_list[BUFFER_SZ] = "[Server] Online users:\n";
+    int has_users = 0;
+
+    pthread_mutex_lock(&clients_mutex);
+    for (int i = 0; i < MAX_CLIENTS; ++i) {
+        if (clients[i]) {
+            char user_info[64];
+            snprintf(user_info, sizeof(user_info), "  %s\n", clients[i]->name);
+            strcat(user_list, user_info);
+            has_users = 1;
+        }
+    }
+    pthread_mutex_unlock(&clients_mutex);
+
+    if (!has_users) {
+        strcat(user_list, "  (No users online)\n");
+    }
+    send(sockfd, user_list, strlen(user_list), 0);
+}
+
+// Hàm gửi thông báo trạng thái đến tất cả client trong phòng công cộng
+void broadcast_status(char *msg) {
+    pthread_mutex_lock(&clients_mutex);
+    for (int i = 0; i < MAX_CLIENTS; ++i) {
+        if (clients[i] && clients[i]->current_room[0] == '\0') {
+            if (write(clients[i]->sockfd, msg, strlen(msg)) < 0) {
+                perror("ERROR: write failed");
             }
         }
     }
@@ -333,9 +369,10 @@ void *handle_client(void *arg) {
                 usleep(100000);
                 fprintf(stderr, "Sending public room history to user '%s'\n", cli->name);
                 send_history_to_client(cli->sockfd, "");
-                sprintf(buff_out, "%s has joined\n", cli->name);
+                sprintf(buff_out, "[Server] %s has joined\n", cli->name);
                 printf("%s", buff_out);
-                send_message(buff_out, cli->uid);
+                broadcast_status(buff_out); // Thông báo trạng thái tham gia
+                send_online_users(cli->sockfd); // Gửi danh sách online cho client mới
             } else {
                 send(cli->sockfd, "Login failed", 13, 0);
                 leave_flag = 1;
@@ -344,9 +381,10 @@ void *handle_client(void *arg) {
             if (register_user(username, password)) {
                 strcpy(cli->name, username);
                 send(cli->sockfd, "OK\n", 3, 0);
-                sprintf(buff_out, "%s has registered and joined\n", cli->name);
+                sprintf(buff_out, "[Server] %s has registered and joined\n", cli->name);
                 printf("%s", buff_out);
-                send_message(buff_out, cli->uid);
+                broadcast_status(buff_out); // Thông báo trạng thái tham gia
+                send_online_users(cli->sockfd); // Gửi danh sách online cho client mới
             } else {
                 send(cli->sockfd, "User already exists", 20, 0);
                 leave_flag = 1;
@@ -521,6 +559,11 @@ void *handle_client(void *arg) {
                 continue;
             }
 
+            if (strcmp(buff_out, "/online") == 0) {
+                send_online_users(cli->sockfd);
+                continue;
+            }
+
             time_t now = time(NULL);
             struct tm *t = localtime(&now);
             char ts[64];
@@ -532,9 +575,9 @@ void *handle_client(void *arg) {
             save_message_to_history(cli->current_room, cli->name, buff_out);
             printf("%s", msg);
         } else if (receive == 0 || strcmp(buff_out, "exit") == 0) {
-            sprintf(buff_out, "%s has left\n", cli->name);
-            send_message(buff_out, cli->uid);
+            sprintf(buff_out, "[Server] %s has left\n", cli->name);
             printf("%s", buff_out);
+            broadcast_status(buff_out); // Thông báo trạng thái rời
             leave_flag = 1;
         }
         bzero(buff_out, BUFFER_SZ);
