@@ -117,6 +117,7 @@ void send_msg_handler() {
             printf("  /join <room>                     : Join a private room\n");
             printf("  /leave                           : Leave current room\n");
             printf("  /rooms                           : List available rooms\n");
+            printf("  /online                          : List online users\n");
             printf("  exit                             : Quit chat\n");
             printf("Formatting:\n");
             printf("  *text*                           : Bold text\n");
@@ -139,6 +140,8 @@ void send_msg_handler() {
 
 void recv_msg_handler() {
     char message[LENGTH] = {};
+
+    char formatted_message[LENGTH + 100] = {};
     FILE *log_file = fopen("client_log.txt", "a");
     if (!log_file) {
         perror("Failed to open client_log.txt");
