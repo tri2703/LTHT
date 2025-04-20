@@ -35,7 +35,7 @@ static _Atomic unsigned int cli_count = 0;
 static int uid = 10;
 client_t *clients[MAX_CLIENTS];
 pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t db_mutex = PTHREAD_MUTEX_INITIALIZER; // Thêm mutex để bảo vệ SQLite
+pthread_mutex_t db_mutex = PTHREAD_MUTEX_INITIALIZER;
 sqlite3 *db;
 
 void str_trim_lf(char* arr, int length) {
@@ -52,7 +52,7 @@ int check_credentials(const char* username, const char* password) {
     snprintf(sql, sizeof(sql), "SELECT password FROM users WHERE username = ?;");
 
     sqlite3_stmt *stmt = NULL;
-    pthread_mutex_lock(&db_mutex); // Khóa mutex
+    pthread_mutex_lock(&db_mutex);
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK || stmt == NULL) {
         fprintf(stderr, "Failed to prepare statement: %s\n", sqlite3_errmsg(db));
@@ -71,7 +71,7 @@ int check_credentials(const char* username, const char* password) {
     }
 
     sqlite3_finalize(stmt);
-    pthread_mutex_unlock(&db_mutex); // Mở khóa mutex
+    pthread_mutex_unlock(&db_mutex);
     return found;
 }
 
@@ -80,7 +80,7 @@ int register_user(const char* username, const char* password) {
     snprintf(sql, sizeof(sql), "SELECT username FROM users WHERE username = ?;");
 
     sqlite3_stmt *stmt = NULL;
-    pthread_mutex_lock(&db_mutex); // Khóa mutex
+    pthread_mutex_lock(&db_mutex);
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK || stmt == NULL) {
         fprintf(stderr, "Failed to prepare statement: %s\n", sqlite3_errmsg(db));
@@ -117,7 +117,7 @@ int register_user(const char* username, const char* password) {
     }
 
     sqlite3_finalize(stmt);
-    pthread_mutex_unlock(&db_mutex); // Mở khóa mutex
+    pthread_mutex_unlock(&db_mutex);
     return 1;
 }
 
@@ -600,7 +600,7 @@ void *handle_client(void *arg) {
                     send_history_to_client(cli->sockfd, room_name);
                 } else {
                     char msg[64];
-                    snprintf(msg, sizeof(msg), "[Server] Access denied.\n");
+                    snprintf(msg, sizeof(msg), "[Server] Room not found.\n");
                     if (cli->sockfd > 0) {
                         send(cli->sockfd, msg, strlen(msg), 0);
                     }
@@ -622,8 +622,15 @@ void *handle_client(void *arg) {
 
             if (strcmp(buff_out, "/rooms") == 0) {
                 char room_list[BUFFER_SZ] = "[Server] Available rooms:\n";
+                int has_rooms = 0;
+
+                // Thêm phòng công khai (public room) vào danh sách
+                strcat(room_list, "  public\n");
+                has_rooms = 1;
+
+                // Lấy danh sách các phòng mà client là thành viên
                 char sql[BUFFER_SZ];
-                snprintf(sql, sizeof(sql), "SELECT name FROM rooms;");
+                snprintf(sql, sizeof(sql), "SELECT room_name FROM room_members WHERE username = ?;");
 
                 sqlite3_stmt *stmt = NULL;
                 pthread_mutex_lock(&db_mutex);
@@ -639,7 +646,8 @@ void *handle_client(void *arg) {
                     continue;
                 }
 
-                int has_rooms = 0;
+                sqlite3_bind_text(stmt, 1, cli->name, -1, SQLITE_STATIC);
+
                 while (sqlite3_step(stmt) == SQLITE_ROW) {
                     const char *name = (const char *)sqlite3_column_text(stmt, 0);
                     char room_info[64];
@@ -651,7 +659,7 @@ void *handle_client(void *arg) {
                 pthread_mutex_unlock(&db_mutex);
 
                 if (!has_rooms) {
-                    strcat(room_list, "  (No rooms available)\n");
+                    strcat(room_list, "  (No private rooms available)\n");
                 }
                 if (cli->sockfd > 0) {
                     send(cli->sockfd, room_list, strlen(room_list), 0);
