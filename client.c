@@ -114,7 +114,9 @@ void send_msg_handler() {
         if (strcmp(message, "/help") == 0) {
             printf("Available commands:\n");
             printf("  /create <room> <user1> <user2> ... : Create private room\n");
-            printf("  /join <room>                     : Join a private room\n");
+            printf("  /join <room>                     : Send request to join a private room\n");
+            printf("  /accept <room> <user>            : Accept a user's join request (admin only)\n");
+            printf("  /reject <room> <user>            : Reject a user's join request (admin only)\n");
             printf("  /leave                           : Leave current room\n");
             printf("  /rooms                           : List available rooms\n");
             printf("  /online                          : List online users\n");
