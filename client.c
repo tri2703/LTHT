@@ -114,7 +114,9 @@ void send_msg_handler() {
         if (strcmp(message, "/help") == 0) {
             printf("Available commands:\n");
             printf("  /create <room> <user1> <user2> ... : Create private room\n");
-            printf("  /join <room>                     : Join a private room\n");
+            printf("  /join <room>                     : Send request to join a private room\n");
+            printf("  /accept <room> <user>            : Accept a user's join request (admin only)\n");
+            printf("  /reject <room> <user>            : Reject a user's join request (admin only)\n");
             printf("  /leave                           : Leave current room\n");
             printf("  /rooms                           : List available rooms\n");
             printf("  /online                          : List online users\n");
@@ -170,7 +172,7 @@ void recv_msg_handler() {
                 printf("%s", formatted_message);
             }
             fflush(stdout); // Ensure message is displayed immediately
-            str_overwrite_stdout();
+            str_overwrite_stdout(); // Đảm bảo dấu nhắc > được hiển thị lại ngay lập tức
         } else if (receive == 0) {
             break;
         }
