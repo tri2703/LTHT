@@ -411,9 +411,8 @@ void send_history_to_client(int sockfd, const char *room) {
     pthread_mutex_unlock(&db_mutex);
     fprintf(stderr, "Sent %d history messages for room '%s' to client\n", msg_count, room[0] ? room : "public");
 
-    usleep(200000);
+    // usleep(200000); 
 }
-
 void *handle_client(void *arg) {
     char buff_out[BUFFER_SZ];
     int leave_flag = 0;
@@ -786,7 +785,7 @@ void *handle_client(void *arg) {
             if (strncmp(buff_out, "/accept ", 8) == 0) {
                 char room_name[32], username[32];
                 sscanf(buff_out + 8, "%s %s", room_name, username);
-
+            
                 // Check if user is a member of the room
                 char sql[BUFFER_SZ];
                 snprintf(sql, sizeof(sql), "SELECT username FROM room_members WHERE room_name = ? AND username = ?;");
@@ -807,7 +806,7 @@ void *handle_client(void *arg) {
                 sqlite3_bind_text(stmt, 2, cli->name, -1, SQLITE_STATIC);
                 int is_member = (sqlite3_step(stmt) == SQLITE_ROW);
                 sqlite3_finalize(stmt);
-
+            
                 if (!is_member) {
                     pthread_mutex_unlock(&db_mutex);
                     char msg[64];
@@ -817,7 +816,7 @@ void *handle_client(void *arg) {
                     }
                     continue;
                 }
-
+            
                 // Check if request exists
                 snprintf(sql, sizeof(sql), "SELECT username FROM pending_requests WHERE room_name = ? AND username = ?;");
                 rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
@@ -835,7 +834,7 @@ void *handle_client(void *arg) {
                 sqlite3_bind_text(stmt, 2, username, -1, SQLITE_STATIC);
                 int request_exists = (sqlite3_step(stmt) == SQLITE_ROW);
                 sqlite3_finalize(stmt);
-
+            
                 if (!request_exists) {
                     pthread_mutex_unlock(&db_mutex);
                     char msg[64];
@@ -845,7 +844,7 @@ void *handle_client(void *arg) {
                     }
                     continue;
                 }
-
+            
                 // Add user to room_members
                 snprintf(sql, sizeof(sql), "INSERT INTO room_members (room_name, username) VALUES (?, ?);");
                 rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
@@ -863,7 +862,7 @@ void *handle_client(void *arg) {
                 sqlite3_bind_text(stmt, 2, username, -1, SQLITE_STATIC);
                 rc = sqlite3_step(stmt);
                 sqlite3_finalize(stmt);
-
+            
                 // Remove request from pending_requests
                 snprintf(sql, sizeof(sql), "DELETE FROM pending_requests WHERE room_name = ? AND username = ?;");
                 rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
@@ -882,7 +881,7 @@ void *handle_client(void *arg) {
                 rc = sqlite3_step(stmt);
                 sqlite3_finalize(stmt);
                 pthread_mutex_unlock(&db_mutex);
-
+            
                 if (rc != SQLITE_DONE) {
                     char msg[64];
                     snprintf(msg, sizeof(msg), "[Server] Failed to process accept request.\n");
@@ -891,14 +890,14 @@ void *handle_client(void *arg) {
                     }
                     continue;
                 }
-
+            
                 char msg[64];
                 snprintf(msg, sizeof(msg), "[Server] Accepted '%s' into room '%s'.\n", username, room_name);
                 if (cli->sockfd > 0) {
                     send(cli->sockfd, msg, strlen(msg), 0);
                 }
-
-                // Notify the user
+            
+                // Notify the user and other room members
                 pthread_mutex_lock(&clients_mutex);
                 for (int i = 0; i < MAX_CLIENTS; ++i) {
                     if (clients[i] && strcmp(clients[i]->name, username) == 0) {
@@ -907,8 +906,10 @@ void *handle_client(void *arg) {
                             send(clients[i]->sockfd, msg, strlen(msg), 0);
                         }
                         strcpy(clients[i]->current_room, room_name);
+                        // Gửi thông báo cho các thành viên khác trong phòng
                         snprintf(msg, sizeof(msg), "[Server] %s has joined room '%s'\n", username, room_name);
                         send_message_to_room(msg, room_name, clients[i]->uid);
+                        // Gửi lịch sử tin nhắn sau khi thông báo
                         send_history_to_client(clients[i]->sockfd, room_name);
                         break;
                     }
