@@ -5,7 +5,7 @@ CC = gcc
 CFLAGS = -Wall -g3 -fsanitize=address -pthread
 
 # Linker flags (libraries)
-LDFLAGS = -lsqlite3 -fsanitize=address
+LDFLAGS = -lsqlite3 -fsanitize=address -pthread
 
 # Source files for server
 SERVER_SOURCES = server.c client_manager.c database.c room.c

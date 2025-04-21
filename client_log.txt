@@ -2819,3 +2819,167 @@ Received: [2025-04-21 15:37:44] vinh: alo
 Received: [Server] tri has left
 Received: [Server] tri has left
 Received: [Server] vinh has left
+Received: [2025-04-21 15:37:34] tien: alooms
+[2025-04-21 15:37:36] tien: alo
+[2025-04-21 15:37:38] tien: alo
+[2025-04-21 15:37:42] vinh: alooms
+[2025-04-21 15:37:44] vinh: alo
+[2025-04-21 15:40:13] tien: alo
+[2025-04-21 15:40:17] vinh: alo
+Received: [2025-04-21 21:10:02] tri: alo?
+[2025-04-21 21:11:27] tien: Welcome Tri!
+[2025-04-21 21:11:35] tri: Okooms
+[Server] tien has joined
+Received: [Server] Online users:
+  tien
+Received: [2025-04-21 15:37:34] tien: alooms
+Received: [2025-04-21 15:37:36] tien: alo
+[2025-04-21 15:37:38] tien: alo
+[2025-04-21 15:37:42] vinh: alooms
+[2025-04-21 15:37:44] vinh: alo
+[2025-04-21 15:40:13] tien: alo
+[2025-04-21 15:40:17] vinh: alo
+[2025-04-21 21:10:02] tri: alo?
+[2025-04-21 21:11:27] tien: Welcome Tri!
+[2025-04-21 21:11:35] tri: Okooms
+[Server] vinh has joined
+[Server] Online users:
+  tien
+  vinh
+Received: [Server] vinh has joined
+Received: [Server] tri has joined
+Received: [2025-04-21 15:37:34] tien: alooms
+[2025-04-21 15:37:36] tien: alo
+[2025-04-21 15:37:38] tien: alo
+[2025-04-21 15:37:42] vinh: alooms
+[2025-04-21 15:37:44] vinh: alo
+[2025-04-21 15:40:13] tien: alo
+[2025-04-21 15:40:17] vinh: alo
+[2025-04-21 21:10:02] tri: alo?
+[2025-04-21 21:11:27] tien: Welcome Tri!
+[2025-04-21 21:11:35] tri: Okooms
+[Server] tri has joined
+[Server] Online users:
+  tien
+  vinh
+  tri
+Received: [Server] tri has joined
+Received: [Server] Room Information:
+You are in: public
+All rooms:
+  public (joined)
+  MU (Creator: vinh, not joined)
+Received: [Server] Database error.
+Received: [Server] Joined room 'MU'
+Received: [2025-04-21 15:40:41] vinh: /roomsMU
+Received: [2025-04-21 21:07:16] vinh: Hello!MU
+[2025-04-21 21:07:22] tien: Hello!MU
+[2025-04-21 21:07:24] tien: a
+[2025-04-21 21:07:26] vinh: b
+[2025-04-21 21:07:30] tien: c
+[2025-04-21 21:07:32] vinh: d
+[2025-04-21 21:07:35] tien: e
+Received: [Server] Database error.
+Received: [Server] Database error.
+Received: [Server] Room Information:
+You are in: MU
+All rooms:
+  public (not joined)
+  MU (Creator: vinh, joined)
+Received: [Server] Room Information:
+You are in: MU
+All rooms:
+  public (not joined)
+  MU (Creator: vinh, joined)
+Received: [Server] vinh has left
+Received: [Server] vinh has left
+Received: [Server] vinh has joined
+Received: [2025-04-21 15:37:34] tien: alooms
+[2025-04-21 15:37:36] tien: alo
+[2025-04-21 15:37:38] tien: alo
+[2025-04-21 15:37:42] vinh: alooms
+[2025-04-21 15:37:44] vinh: alo
+[2025-04-21 15:40:13] tien: alo
+[2025-04-21 15:40:17] vinh: alo
+[2025-04-21 21:10:02] tri: alo?
+[2025-04-21 21:11:27] tien: Welcome Tri!
+[2025-04-21 21:11:35] tri: Okooms
+[Server] vinh has joined
+[Server] Online users:
+  tien
+  vinh
+  tri
+Received: [Server] vinh has joined
+Received: [Server] Room Information:
+You are in: public
+All rooms:
+  public (joined)
+  MU (Creator: vinh, member)
+Received: [Server] Created room 'abc'
+Received: [Server] Room Information:
+You are in: abc
+All rooms:
+  public (not joined)
+  MU (Creator: vinh, member)
+  abc (Creator: vinh, joined)
+Received: [Server] Database error.
+Received: [Server] vinh has left
+Received: [Server] vinh has left
+Received: [Server] tri has left
+Received: [2025-04-21 15:37:34] tien: alooms
+[2025-04-21 15:37:36] tien: alo
+[2025-04-21 15:37:38] tien: alo
+[2025-04-21 15:37:42] vinh: alooms
+[2025-04-21 15:37:44] vinh: alo
+[2025-04-21 15:40:13] tien: alo
+[2025-04-21 15:40:17] vinh: alo
+[2025-04-21 21:10:02] tri: alo?
+[2025-04-21 21:11:27] tien: Welcome Tri!
+[2025-04-21 21:11:35] tri: Okooms
+[Server] vinh has joined
+[Server] Online users:
+  vinh
+Received: [2025-04-21 15:37:34] tien: alooms
+Received: [2025-04-21 15:37:36] tien: alo
+[2025-04-21 15:37:38] tien: alo
+[2025-04-21 15:37:42] vinh: alooms
+[2025-04-21 15:37:44] vinh: alo
+[2025-04-21 15:40:13] tien: alo
+[2025-04-21 15:40:17] vinh: alo
+[2025-04-21 21:10:02] tri: alo?
+[2025-04-21 21:11:27] tien: Welcome Tri!
+[2025-04-21 21:11:35] tri: Okooms
+[Server] tien has joined
+Received: [Server] Online users:
+  vinh
+  tien
+Received: [Server] tien has joined
+Received: [Server] tri has joined
+Received: [2025-04-21 15:37:34] tien: alooms
+[2025-04-21 15:37:36] tien: alo
+[2025-04-21 15:37:38] tien: alo
+[2025-04-21 15:37:42] vinh: alooms
+[2025-04-21 15:37:44] vinh: alo
+[2025-04-21 15:40:13] tien: alo
+[2025-04-21 15:40:17] vinh: alo
+[2025-04-21 21:10:02] tri: alo?
+[2025-04-21 21:11:27] tien: Welcome Tri!
+[2025-04-21 21:11:35] tri: Okooms
+[Server] tri has joined
+[Server] Online users:
+  vinh
+  tien
+  tri
+Received: [Server] tri has joined
+Received: [Server] Database error.
+Received: [Server] Room Information:
+You are in: public
+All rooms:
+  public (joined)
+  MU (Creator: vinh, not joined)
+  abc (Creator: vinh, not joined)
+Received: [Server] Database error.
+Received: [Server] Database error.
+Received: [Server] tri has left
+Received: [Server] tri has left
+Received: [Server] vinh has left

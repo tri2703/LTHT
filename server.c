@@ -18,7 +18,6 @@
 
 static int uid = 10;
 
-
 void *handle_client(void *arg) {
     char buff_out[BUFFER_SZ];
     int leave_flag = 0;
@@ -191,7 +190,6 @@ void *handle_client(void *arg) {
                     sqlite3_finalize(stmt);
                 }
 
-
                 char *token = strtok(users, " ");
                 while (token) {
                     snprintf(sql, sizeof(sql), "INSERT OR IGNORE INTO room_members (room_name, username) VALUES (?, ?);");
@@ -340,7 +338,6 @@ void *handle_client(void *arg) {
                     continue;
                 }
 
-
                 time_t now = time(NULL);
                 struct tm *t = localtime(&now);
                 char ts[20];
@@ -361,10 +358,10 @@ void *handle_client(void *arg) {
                 sqlite3_bind_text(stmt, 2, cli->name, -1, SQLITE_STATIC);
                 sqlite3_bind_text(stmt, 3, ts, -1, SQLITE_STATIC);
                 rc = sqlite3_step(stmt);
+                sqlite3_finalize(stmt);
+                pthread_mutex_unlock(&db_mutex);
+
                 if (rc != SQLITE_DONE) {
-                    fprintf(stderr, "Failed to insert join request: %s\n", sqlite3_errmsg(db));
-                    sqlite3_finalize(stmt);
-                    pthread_mutex_unlock(&db_mutex);
                     char msg[64];
                     snprintf(msg, sizeof(msg), "[Server] Failed to send join request.\n");
                     if (cli->sockfd > 0) {
@@ -372,14 +369,13 @@ void *handle_client(void *arg) {
                     }
                     continue;
                 }
-                sqlite3_finalize(stmt);
-                pthread_mutex_unlock(&db_mutex);
 
                 char msg[64];
                 snprintf(msg, sizeof(msg), "[Server] Join request sent for room '%s'.\n", room_name);
                 if (cli->sockfd > 0) {
                     send(cli->sockfd, msg, strlen(msg), 0);
                 }
+                fprintf(stderr, "Notifying room members of join request for '%s' by '%s'\n", room_name, cli->name);
                 notify_room_members(room_name, cli->name);
                 continue;
             }
@@ -557,7 +553,6 @@ void *handle_client(void *arg) {
                     if (cli->sockfd > 0) {
                         send(cli->sockfd, msg, strlen(msg), 0);
                     }
-
                     continue;
                 }
                 sqlite3_bind_text(stmt, 1, room_name, -1, SQLITE_STATIC);
@@ -582,7 +577,6 @@ void *handle_client(void *arg) {
                     pthread_mutex_unlock(&db_mutex);
                     char msg[64];
                     snprintf(msg, sizeof(msg), "[Server] Database error.\n");
-
                     if (cli->sockfd > 0) {
                         send(cli->sockfd, msg, strlen(msg), 0);
                     }
@@ -624,7 +618,6 @@ void *handle_client(void *arg) {
             }
 
             if (strcmp(buff_out, "/leave") == 0) {
-
                 char msg[64];
                 snprintf(msg, sizeof(msg), "[Server] %s has left room '%s'\n", cli->name, cli->current_room);
                 send_message_to_room(msg, cli->current_room, cli->uid);
@@ -692,7 +685,6 @@ void *handle_client(void *arg) {
                         send(cli->sockfd, msg, strlen(msg), 0);
                     }
                     continue;
-
                 }
                 while (sqlite3_step(stmt) == SQLITE_ROW) {
                     const char *name = (const char *)sqlite3_column_text(stmt, 0);
