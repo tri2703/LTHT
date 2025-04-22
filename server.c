@@ -208,48 +208,54 @@ void broadcast_status(char *msg) {
 
 void notify_room_members(const char *room_name, const char *username) {
     char sql[BUFFER_SZ];
-    snprintf(sql, sizeof(sql), "SELECT username FROM room_members WHERE room_name = ?;");
+    snprintf(sql, sizeof(sql), "SELECT created_by FROM rooms WHERE name = ?;");
 
     sqlite3_stmt *stmt = NULL;
     pthread_mutex_lock(&db_mutex);
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK || stmt == NULL) {
-        fprintf(stderr, "Failed to prepare statement for room members lookup: %s\n", sqlite3_errmsg(db));
+        fprintf(stderr, "Failed to prepare statement for creator lookup: %s\n", sqlite3_errmsg(db));
         pthread_mutex_unlock(&db_mutex);
         return;
     }
 
     sqlite3_bind_text(stmt, 1, room_name, -1, SQLITE_STATIC);
-    int members_found = 0;
-    pthread_mutex_lock(&clients_mutex);
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
-        const char *temp_member = (const char *)sqlite3_column_text(stmt, 0);
-        if (!temp_member) continue;
-        char member[32] = {0};
-        strncpy(member, temp_member, sizeof(member) - 1);
-
-        for (int i = 0; i < MAX_CLIENTS; ++i) {
-            if (clients[i] && strcmp(clients[i]->name, member) == 0 && clients[i]->sockfd > 0) {
-                char msg[BUFFER_SZ];
-                snprintf(msg, sizeof(msg), "[Server] %s has requested to join room '%s'. Use /accept %s %s or /reject %s %s\n",
-                         username, room_name, room_name, username, room_name, username);
-                if (write(clients[i]->sockfd, msg, strlen(msg)) < 0) {
-                    perror("ERROR: Failed to notify room member");
-                } else {
-                    members_found++;
-                }
-                break;
-            }
+    char creator[32] = {0};
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        const char *temp_creator = (const char *)sqlite3_column_text(stmt, 0);
+        if (temp_creator) {
+            strncpy(creator, temp_creator, sizeof(creator) - 1);
         }
     }
     sqlite3_finalize(stmt);
     pthread_mutex_unlock(&db_mutex);
+
+    if (creator[0] == '\0') {
+        fprintf(stderr, "Creator not found for room '%s'\n", room_name);
+        return;
+    }
+
+    pthread_mutex_lock(&clients_mutex);
+    int notified = 0;
+    for (int i = 0; i < MAX_CLIENTS; ++i) {
+        if (clients[i] && strcmp(clients[i]->name, creator) == 0 && clients[i]->sockfd > 0) {
+            char msg[BUFFER_SZ];
+            snprintf(msg, sizeof(msg), "[Server] %s has requested to join room '%s'. Use /accept %s %s or /reject %s %s\n",
+                     username, room_name, room_name, username, room_name, username);
+            if (write(clients[i]->sockfd, msg, strlen(msg)) < 0) {
+                perror("ERROR: Failed to notify room creator");
+            } else {
+                notified = 1;
+            }
+            break;
+        }
+    }
     pthread_mutex_unlock(&clients_mutex);
 
-    if (!members_found) {
-        fprintf(stderr, "No online members found for room '%s'\n", room_name);
+    if (!notified) {
+        fprintf(stderr, "Creator '%s' for room '%s' is not online\n", creator, room_name);
     } else {
-        fprintf(stderr, "Notified %d members for room '%s'\n", members_found, room_name);
+        fprintf(stderr, "Notified creator '%s' for room '%s'\n", creator, room_name);
     }
 }
 
@@ -1150,7 +1156,7 @@ void *handle_client(void *arg) {
                 }
                 sqlite3_finalize(stmt);
 
-                snprintf(sql, sizeof(sql), "SELECT name FROM rooms;");
+                snprintf(sql, sizeof(sql), "SELECT name, created_by FROM rooms;");
                 rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
                 if (rc != SQLITE_OK || stmt == NULL) {
                     fprintf(stderr, "Failed to prepare all rooms query: %s\n", sqlite3_errmsg(db));
@@ -1164,11 +1170,12 @@ void *handle_client(void *arg) {
                 }
                 while (sqlite3_step(stmt) == SQLITE_ROW) {
                     const char *name = (const char *)sqlite3_column_text(stmt, 0);
-                    char room_info[64];
+                    const char *creator = (const char *)sqlite3_column_text(stmt, 1);
+                    char room_info[128];
                     int is_member = (strstr(member_rooms, name) != NULL);
                     int is_current = (strcmp(name, cli->current_room) == 0);
-                    snprintf(room_info, sizeof(room_info), "  %s (%s)\n", name,
-                             is_current ? "joined" : (is_member ? "joined" : "not joined"));
+                    snprintf(room_info, sizeof(room_info), "  %s (%s, created by %s)\n", name,
+                             is_current ? "joined" : (is_member ? "joined" : "not joined"), creator);
                     strcat(room_list, room_info);
                     has_rooms = 1;
                 }
