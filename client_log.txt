@@ -3,154 +3,51 @@ Received: [2025-04-18 05:47:43] tien: hello room1
 [2025-04-18 05:47:50] tien: helllo
 [2025-04-18 05:48:49] tien1: hello room1
 [2025-04-18 05:48:53] tien1: hello
-Received: [Server] tien has joined
+Received: tri has registered and joined
+Received: [2025-04-18 20:53:36] tri: ek
+Received: [2025-04-18 20:53:45] tien: gi?
+Received: [2025-04-18 20:53:53] tri: gi cai con cac
+Received: [2025-04-18 20:56:29] tri: eit
+Received: tri has left
+Received: [2025-04-18 20:53:36] tri: ek
+[2025-04-18 20:53:45] tien: gi?
+[2025-04-18 20:53:53] tri: gi cai con cac
+[2025-04-18 20:56:29] tri: eit
+Received: [Server] tri has joined
 Received: [Server] Online users:
-  tien
-Received: [Server] Available rooms:
-  public
-  room1
-Received: [Server] Room not found.
-Received: [Server] Room not found.
-Received: [2025-04-20 04:50:20] tien: rooms
-Received: [Server] tien1 has joined
-[Server] Online users:
-  tien1
-Received: [Server] Available rooms:
-  public
-  room1
-Received: [Server] Joined room
-Received: [2025-04-18 05:47:43] tien: hello room1
-[2025-04-18 05:47:50] tien: helllo
-[2025-04-18 05:48:49] tien1: hello room1
-[2025-04-18 05:48:53] tien1: hello
-Received: [2025-04-20 04:50:20] tien: rooms
-Received: [Server] tien1 has joined
-[Server] Online users:
-  tien1
-Received: [2025-04-20 04:50:20] tien: rooms
-[2025-04-20 04:57:40] tien1: hellllo
-Received: [Server] tien1 has joined
-[Server] Online users:
-  tien1
-Received: [Server] Joined room
-[2025-04-18 05:47:43] tien: hello room1
-[2025-04-18 05:47:50] tien: helllo
-[2025-04-18 05:48:49] tien1: hello room1
-[2025-04-18 05:48:53] tien1: hello
-[2025-04-20 04:52:29] tien1: hello room1
-[2025-04-20 04:53:31] tien1: abc
-Received: [2025-04-20 04:50:20] tien: rooms
-[2025-04-20 04:57:40] tien1: hellllo
-[2025-04-20 05:02:36] tien1: hello
-Received: [Server] tien1 has joined
-[Server] Online users:
-  tien1
-Received: [2025-04-20 04:50:20] tien: rooms
-Received: [2025-04-20 04:57:40] tien1: hellllo
-[2025-04-20 05:02:36] tien1: hello
-[2025-04-20 05:04:04] tien1: hello
+  tri
+Received: [2025-04-18 20:53:36] tri: ek
+[2025-04-18 20:53:45] tien: gi?
+[2025-04-18 20:53:53] tri: gi cai con cac
+[2025-04-18 20:56:29] tri: eit
 Received: [Server] tien has joined
+Received: [Server] tien has joined
+[Server] Online users:
+  tri
+  tien
 Received: [Server] Online users:
-  tien1
+  tri
   tien
-Received: [Server] tien has joined
-Received: [Server] Room not found.
-Received: [2025-04-20 05:13:38] tien1: /leavepublic
-Received: [Server] Available rooms:
-  public
-  room1
-Received: [2025-04-20 05:13:54] tien1: alooms
-Received: [2025-04-20 05:14:05] tien1: alo
-Received: [2025-04-20 05:14:07] tien1: alo
-Received: [Server] tien1 has left
-Received: [2025-04-20 04:50:20] tien: rooms
-[2025-04-20 04:57:40] tien1: hellllo
-[2025-04-20 05:02:36] tien1: hello
-[2025-04-20 05:04:04] tien1: hello
-[2025-04-20 05:13:38] tien1: /leavepublic
-[2025-04-20 05:13:54] tien1: alooms
-[2025-04-20 05:14:05] tien1: alo
-[2025-04-20 05:14:07] tien1: alo
-Received: [Server] tien has joined
-[Server] Online users:
-  tien
-Received: [2025-04-20 04:50:20] tien: rooms
-Received: [2025-04-20 04:57:40] tien1: hellllo
-[2025-04-20 05:02:36] tien1: hello
-[2025-04-20 05:04:04] tien1: hello
-[2025-04-20 05:13:38] tien1: /leavepublic
-[2025-04-20 05:13:54] tien1: alooms
-[2025-04-20 05:14:05] tien1: alo
-[2025-04-20 05:14:07] tien1: alo
-Received: [Server] tien1 has joined
-Received: [Server] tien1 has joined
 Received: [Server] Online users:
+  tri
   tien
-  tien1
-Received: [2025-04-20 05:18:55] tien1: hello
-Received: [2025-04-20 05:18:58] tien1: allo
-Received: [2025-04-20 05:19:01] tien1: ssdadad
-Received: [Server] tien2 has registered and joined
-Received: [Server] tien2 has registered and joined
-Received: [Server] tien2 has registered and joined
-[Server] Online users:
-  tien
-  tien1
-  tien2
-Received: [2025-04-20 05:20:24] tien2: allos
-Received: [2025-04-20 05:20:24] tien2: allos
-Received: [Server] Available rooms:
-  public
-Received: [Server] Available rooms:
-  public
-  room1
-Received: [Server] Available rooms:
-  public
-  room1
-Received: [Server] tien1 has left
-Received: [Server] tien1 has left
-Received: [Server] tien2 has left
-Received: [2025-04-20 04:50:20] tien: rooms
-[2025-04-20 04:57:40] tien1: hellllo
-[2025-04-20 05:02:36] tien1: hello
-[2025-04-20 05:04:04] tien1: hello
-[2025-04-20 05:13:38] tien1: /leavepublic
-[2025-04-20 05:13:54] tien1: alooms
-Received: [2025-04-20 05:14:05] tien1: alo
-[2025-04-20 05:14:07] tien1: alo
-[2025-04-20 05:18:55] tien1: hello
-[2025-04-20 05:18:58] tien1: allo
-[2025-04-20 05:19:01] tien1: ssdadad
-[2025-04-20 05:20:24] tien2: allos
+Received: [Server] Access denied.
+Received: [2025-04-18 20:53:36] tri: ek
+[2025-04-18 20:53:45] tien: gi?
+[2025-04-18 20:53:53] tri: gi cai con cac
+[2025-04-18 20:56:29] tri: eit
 Received: [Server] tien has joined
 [Server] Online users:
   tien
-Received: [Server] Room Information:
-You are in: public
-All rooms:
-  public (joined)
-  room1 (joined)
-Received: [2025-04-20 04:50:20] tien: rooms
-Received: [2025-04-20 04:57:40] tien1: hellllo
-[2025-04-20 05:02:36] tien1: hello
-[2025-04-20 05:04:04] tien1: hello
-[2025-04-20 05:13:38] tien1: /leavepublic
-[2025-04-20 05:13:54] tien1: alooms
-[2025-04-20 05:14:05] tien1: alo
-[2025-04-20 05:14:07] tien1: alo
-[2025-04-20 05:18:55] tien1: hello
-[2025-04-20 05:18:58] tien1: allo
-[2025-04-20 05:19:01] tien1: ssdadad
-[2025-04-20 05:20:24] tien2: allos
-Received: [Server] tien2 has joined
-Received: [Server] Online users:
+Received: [2025-04-18 20:53:36] tri: ek
+[2025-04-18 20:53:45] tien: gi?
+[2025-04-18 20:53:53] tri: gi cai con cac
+[2025-04-18 20:56:29] tri: eit
+Received: [Server] tri has joined
+Received: [Server] tri has joined
+[Server] Online users:
   tien
-  tien2
-Received: [Server] tien2 has joined
-Received: [Server] Room Information:
-You are in: public
-All rooms:
-  public (joined)
-  room1 (not joined)
-Received: [Server] Room not found or access denied.
-
+  tri
+Received: [2025-04-18 21:07:33] tri: Hello :smile: and :heart:
+Received: [2025-04-18 21:07:48] tri: *Bold* _italic_ :smile:
+Received: [Server] tien has left

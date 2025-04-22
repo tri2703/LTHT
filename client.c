@@ -172,7 +172,7 @@ void recv_msg_handler() {
                 printf("%s", formatted_message);
             }
             fflush(stdout); // Ensure message is displayed immediately
-            str_overwrite_stdout(); // Đảm bảo dấu nhắc > được hiển thị lại ngay lập tức
+            str_overwrite_stdout();
         } else if (receive == 0) {
             break;
         }
