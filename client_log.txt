@@ -1,0 +1,53 @@
+Received: [Server] Joined room
+Received: [2025-04-18 05:47:43] tien: hello room1
+[2025-04-18 05:47:50] tien: helllo
+[2025-04-18 05:48:49] tien1: hello room1
+[2025-04-18 05:48:53] tien1: hello
+Received: tri has registered and joined
+Received: [2025-04-18 20:53:36] tri: ek
+Received: [2025-04-18 20:53:45] tien: gi?
+Received: [2025-04-18 20:53:53] tri: gi cai con cac
+Received: [2025-04-18 20:56:29] tri: eit
+Received: tri has left
+Received: [2025-04-18 20:53:36] tri: ek
+[2025-04-18 20:53:45] tien: gi?
+[2025-04-18 20:53:53] tri: gi cai con cac
+[2025-04-18 20:56:29] tri: eit
+Received: [Server] tri has joined
+Received: [Server] Online users:
+  tri
+Received: [2025-04-18 20:53:36] tri: ek
+[2025-04-18 20:53:45] tien: gi?
+[2025-04-18 20:53:53] tri: gi cai con cac
+[2025-04-18 20:56:29] tri: eit
+Received: [Server] tien has joined
+Received: [Server] tien has joined
+[Server] Online users:
+  tri
+  tien
+Received: [Server] Online users:
+  tri
+  tien
+Received: [Server] Online users:
+  tri
+  tien
+Received: [Server] Access denied.
+Received: [2025-04-18 20:53:36] tri: ek
+[2025-04-18 20:53:45] tien: gi?
+[2025-04-18 20:53:53] tri: gi cai con cac
+[2025-04-18 20:56:29] tri: eit
+Received: [Server] tien has joined
+[Server] Online users:
+  tien
+Received: [2025-04-18 20:53:36] tri: ek
+[2025-04-18 20:53:45] tien: gi?
+[2025-04-18 20:53:53] tri: gi cai con cac
+[2025-04-18 20:56:29] tri: eit
+Received: [Server] tri has joined
+Received: [Server] tri has joined
+[Server] Online users:
+  tien
+  tri
+Received: [2025-04-18 21:07:33] tri: Hello :smile: and :heart:
+Received: [2025-04-18 21:07:48] tri: *Bold* _italic_ :smile:
+Received: [Server] tien has left
