@@ -153,3 +153,4 @@ All rooms:
   public (joined)
   room1 (not joined)
 Received: [Server] Room not found or access denied.
+
