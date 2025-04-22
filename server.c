@@ -35,16 +35,8 @@ static _Atomic unsigned int cli_count = 0;
 static int uid = 10;
 client_t *clients[MAX_CLIENTS];
 pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
-
 pthread_mutex_t db_mutex = PTHREAD_MUTEX_INITIALIZER;
 sqlite3 *db;
-
-// Hàm chuyển chuỗi thành chữ thường
-void to_lowercase(char *str) {
-    for (int i = 0; str[i]; i++) {
-        str[i] = tolower(str[i]);
-    }
-}
 
 void str_trim_lf(char* arr, int length) {
     for (int i = 0; i < length; i++) {
@@ -101,7 +93,7 @@ int register_user(const char* username, const char* password) {
     if (sqlite3_step(stmt) == SQLITE_ROW) {
         sqlite3_finalize(stmt);
         pthread_mutex_unlock(&db_mutex);
-        return 0; // User already exists
+        return 0;
     }
     sqlite3_finalize(stmt);
 
@@ -234,9 +226,8 @@ void notify_room_members(const char *room_name, const char *username) {
         const char *temp_member = (const char *)sqlite3_column_text(stmt, 0);
         if (!temp_member) continue;
         char member[32] = {0};
-        strncpy(member, temp_member, sizeof(member) - 1); // Copy to local buffer
+        strncpy(member, temp_member, sizeof(member) - 1);
 
-        // Notify each member if online
         for (int i = 0; i < MAX_CLIENTS; ++i) {
             if (clients[i] && strcmp(clients[i]->name, member) == 0 && clients[i]->sockfd > 0) {
                 char msg[BUFFER_SZ];
@@ -247,7 +238,7 @@ void notify_room_members(const char *room_name, const char *username) {
                 } else {
                     members_found++;
                 }
-                break; // Found and notified this member
+                break;
             }
         }
     }
@@ -320,7 +311,6 @@ int init_database() {
     char *err_msg = 0;
 
     pthread_mutex_lock(&db_mutex);
-
     rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "SQL error: %s\n", err_msg);
@@ -340,14 +330,12 @@ int init_database() {
 
             sqlite3_stmt *stmt = NULL;
             pthread_mutex_lock(&db_mutex);
-
             if (sqlite3_prepare_v2(db, sql_insert, -1, &stmt, NULL) == SQLITE_OK) {
                 sqlite3_bind_text(stmt, 1, username, -1, SQLITE_STATIC);
                 sqlite3_bind_text(stmt, 2, password, -1, SQLITE_STATIC);
                 sqlite3_step(stmt);
                 sqlite3_finalize(stmt);
             }
-
             pthread_mutex_unlock(&db_mutex);
         }
         fclose(fp);
@@ -522,12 +510,12 @@ void *handle_client(void *arg) {
             cli->msg_index = 0;
         }
 
-        bzero(buff_out, BUFFER_SZ); // Dọn sạch buffer trước khi nhận dữ liệu mới
+        bzero(buff_out, BUFFER_SZ);
         int receive = recv(cli->sockfd, buff_out, BUFFER_SZ - 1, 0);
         if (receive > 0) {
-            buff_out[receive] = '\0'; // Đảm bảo chuỗi kết thúc bằng null
+            buff_out[receive] = '\0';
             str_trim_lf(buff_out, receive);
-            fprintf(stderr, "Received from user '%s': %s\n", cli->name, buff_out); // Log để debug
+            fprintf(stderr, "Received from user '%s': %s\n", cli->name, buff_out);
 
             if (is_spamming(cli)) {
                 char msg[64];
@@ -541,7 +529,6 @@ void *handle_client(void *arg) {
             if (strncmp(buff_out, "/create ", 8) == 0) {
                 char room_name[32] = {0}, users[BUFFER_SZ];
                 sscanf(buff_out + 8, "%s %[^\n]", room_name, users);
-                to_lowercase(room_name); // Chuyển tên phòng thành chữ thường trước khi lưu
                 fprintf(stderr, "User '%s' creating room '%s'\n", cli->name, room_name);
 
                 char sql_count[BUFFER_SZ];
@@ -550,7 +537,6 @@ void *handle_client(void *arg) {
                 sqlite3_stmt *stmt_count = NULL;
                 pthread_mutex_lock(&db_mutex);
 
-                // Bắt đầu giao dịch
                 int rc = sqlite3_exec(db, "BEGIN TRANSACTION;", 0, 0, 0);
                 if (rc != SQLITE_OK) {
                     fprintf(stderr, "Failed to begin transaction: %s\n", sqlite3_errmsg(db));
@@ -629,7 +615,6 @@ void *handle_client(void *arg) {
                     sqlite3_finalize(stmt);
                 }
 
-                // Add other members
                 char *token = strtok(users, " ");
                 while (token) {
                     snprintf(sql, sizeof(sql), "INSERT OR IGNORE INTO room_members (room_name, username) VALUES (?, ?);");
@@ -643,7 +628,6 @@ void *handle_client(void *arg) {
                     token = strtok(NULL, " ");
                 }
 
-                // Commit giao dịch
                 rc = sqlite3_exec(db, "COMMIT;", 0, 0, 0);
                 if (rc != SQLITE_OK) {
                     fprintf(stderr, "Failed to commit transaction: %s\n", sqlite3_errmsg(db));
@@ -674,13 +658,11 @@ void *handle_client(void *arg) {
             if (strncmp(buff_out, "/join ", 6) == 0) {
                 char room_name[32] = {0};
                 sscanf(buff_out + 6, "%s", room_name);
-                to_lowercase(room_name); // Chuyển tên phòng thành chữ thường
                 fprintf(stderr, "User '%s' requesting to join room '%s'\n", cli->name, room_name);
 
                 pthread_mutex_lock(&db_mutex);
-                // Check if room exists
                 char sql[BUFFER_SZ];
-                snprintf(sql, sizeof(sql), "SELECT created_by FROM rooms WHERE name = ?;");
+                snprintf(sql, sizeof(sql), "SELECT created_by FROM rooms WHERE LOWER(name) = LOWER(?);");
                 sqlite3_stmt *stmt = NULL;
                 int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
                 if (rc != SQLITE_OK || stmt == NULL) {
@@ -695,9 +677,20 @@ void *handle_client(void *arg) {
                 }
                 sqlite3_bind_text(stmt, 1, room_name, -1, SQLITE_STATIC);
                 int room_exists = (sqlite3_step(stmt) == SQLITE_ROW);
-                sqlite3_finalize(stmt);
-
-                if (!room_exists) {
+                char original_room_name[32] = {0};
+                if (room_exists) {
+                    snprintf(sql, sizeof(sql), "SELECT name FROM rooms WHERE LOWER(name) = LOWER(?);");
+                    rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+                    if (rc == SQLITE_OK && stmt != NULL) {
+                        sqlite3_bind_text(stmt, 1, room_name, -1, SQLITE_STATIC);
+                        if (sqlite3_step(stmt) == SQLITE_ROW) {
+                            const char *name = (const char *)sqlite3_column_text(stmt, 0);
+                            strncpy(original_room_name, name, sizeof(original_room_name) - 1);
+                        }
+                    }
+                    sqlite3_finalize(stmt);
+                } else {
+                    sqlite3_finalize(stmt);
                     pthread_mutex_unlock(&db_mutex);
                     char msg[64];
                     snprintf(msg, sizeof(msg), "[Server] Room '%s' does not exist.\n", room_name);
@@ -708,8 +701,7 @@ void *handle_client(void *arg) {
                     continue;
                 }
 
-                // Check if user is already a member
-                snprintf(sql, sizeof(sql), "SELECT username FROM room_members WHERE room_name = ? AND username = ?;");
+                snprintf(sql, sizeof(sql), "SELECT username FROM room_members WHERE LOWER(room_name) = LOWER(?) AND username = ?;");
                 rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
                 if (rc != SQLITE_OK || stmt == NULL) {
                     fprintf(stderr, "Failed to prepare membership check: %s\n", sqlite3_errmsg(db));
@@ -727,21 +719,20 @@ void *handle_client(void *arg) {
                 sqlite3_finalize(stmt);
 
                 if (is_member) {
-                    strcpy(cli->current_room, room_name);
+                    strcpy(cli->current_room, original_room_name);
                     pthread_mutex_unlock(&db_mutex);
                     char msg[64];
-                    snprintf(msg, sizeof(msg), "[Server] Joined room '%s'\n", room_name);
+                    snprintf(msg, sizeof(msg), "[Server] Joined room '%s'\n", original_room_name);
                     if (cli->sockfd > 0) {
                         send(cli->sockfd, msg, strlen(msg), 0);
                     }
-                    fprintf(stderr, "Sending history for room '%s' to user '%s'\n", room_name, cli->name);
-                    send_history_to_client(cli->sockfd, room_name);
-                    usleep(500000); // Thêm thời gian chờ để đồng bộ
+                    fprintf(stderr, "Sending history for room '%s' to user '%s'\n", original_room_name, cli->name);
+                    send_history_to_client(cli->sockfd, original_room_name);
+                    usleep(500000);
                     continue;
                 }
 
-                // Check if request already exists
-                snprintf(sql, sizeof(sql), "SELECT username FROM pending_requests WHERE room_name = ? AND username = ?;");
+                snprintf(sql, sizeof(sql), "SELECT username FROM pending_requests WHERE LOWER(room_name) = LOWER(?) AND username = ?;");
                 rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
                 if (rc != SQLITE_OK || stmt == NULL) {
                     fprintf(stderr, "Failed to prepare pending request check: %s\n", sqlite3_errmsg(db));
@@ -768,7 +759,6 @@ void *handle_client(void *arg) {
                     continue;
                 }
 
-                // Verify user exists in users table (for foreign key)
                 snprintf(sql, sizeof(sql), "SELECT username FROM users WHERE username = ?;");
                 rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
                 if (rc != SQLITE_OK || stmt == NULL) {
@@ -795,7 +785,6 @@ void *handle_client(void *arg) {
                     continue;
                 }
 
-                // Add join request
                 time_t now = time(NULL);
                 struct tm *t = localtime(&now);
                 char ts[20];
@@ -812,7 +801,7 @@ void *handle_client(void *arg) {
                     }
                     continue;
                 }
-                sqlite3_bind_text(stmt, 1, room_name, -1, SQLITE_STATIC);
+                sqlite3_bind_text(stmt, 1, original_room_name, -1, SQLITE_STATIC);
                 sqlite3_bind_text(stmt, 2, cli->name, -1, SQLITE_STATIC);
                 sqlite3_bind_text(stmt, 3, ts, -1, SQLITE_STATIC);
                 rc = sqlite3_step(stmt);
@@ -831,26 +820,36 @@ void *handle_client(void *arg) {
                 pthread_mutex_unlock(&db_mutex);
 
                 char msg[64];
-                snprintf(msg, sizeof(msg), "[Server] Join request sent for room '%s'.\n", room_name);
+                snprintf(msg, sizeof(msg), "[Server] Join request sent for room '%s'.\n", original_room_name);
                 if (cli->sockfd > 0) {
                     send(cli->sockfd, msg, strlen(msg), 0);
                 }
-                notify_room_members(room_name, cli->name);
+                notify_room_members(original_room_name, cli->name);
                 continue;
             }
 
             if (strncmp(buff_out, "/accept ", 8) == 0) {
                 char room_name[32] = {0}, username[32];
                 sscanf(buff_out + 8, "%s %s", room_name, username);
-                to_lowercase(room_name); // Chuyển tên phòng thành chữ thường
                 fprintf(stderr, "User '%s' accepting '%s' into room '%s'\n", cli->name, username, room_name);
 
-                // Check if user is a member of the room
-                char sql[BUFFER_SZ];
-                snprintf(sql, sizeof(sql), "SELECT username FROM room_members WHERE room_name = ? AND username = ?;");
-                sqlite3_stmt *stmt = NULL;
+                char original_room_name[32] = {0};
                 pthread_mutex_lock(&db_mutex);
+                char sql[BUFFER_SZ];
+                snprintf(sql, sizeof(sql), "SELECT name FROM rooms WHERE LOWER(name) = LOWER(?);");
+                sqlite3_stmt *stmt = NULL;
                 int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+                if (rc == SQLITE_OK && stmt != NULL) {
+                    sqlite3_bind_text(stmt, 1, room_name, -1, SQLITE_STATIC);
+                    if (sqlite3_step(stmt) == SQLITE_ROW) {
+                        const char *name = (const char *)sqlite3_column_text(stmt, 0);
+                        strncpy(original_room_name, name, sizeof(original_room_name) - 1);
+                    }
+                }
+                sqlite3_finalize(stmt);
+
+                snprintf(sql, sizeof(sql), "SELECT username FROM room_members WHERE LOWER(room_name) = LOWER(?) AND username = ?;");
+                rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
                 if (rc != SQLITE_OK || stmt == NULL) {
                     fprintf(stderr, "Failed to check room membership: %s\n", sqlite3_errmsg(db));
                     pthread_mutex_unlock(&db_mutex);
@@ -876,8 +875,7 @@ void *handle_client(void *arg) {
                     continue;
                 }
 
-                // Check if request exists
-                snprintf(sql, sizeof(sql), "SELECT username FROM pending_requests WHERE room_name = ? AND username = ?;");
+                snprintf(sql, sizeof(sql), "SELECT username FROM pending_requests WHERE LOWER(room_name) = LOWER(?) AND username = ?;");
                 rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
                 if (rc != SQLITE_OK || stmt == NULL) {
                     fprintf(stderr, "Failed to check pending request: %s\n", sqlite3_errmsg(db));
@@ -904,7 +902,6 @@ void *handle_client(void *arg) {
                     continue;
                 }
 
-                // Add user to room_members
                 snprintf(sql, sizeof(sql), "INSERT INTO room_members (room_name, username) VALUES (?, ?);");
                 rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
                 if (rc != SQLITE_OK || stmt == NULL) {
@@ -917,13 +914,12 @@ void *handle_client(void *arg) {
                     }
                     continue;
                 }
-                sqlite3_bind_text(stmt, 1, room_name, -1, SQLITE_STATIC);
+                sqlite3_bind_text(stmt, 1, original_room_name, -1, SQLITE_STATIC);
                 sqlite3_bind_text(stmt, 2, username, -1, SQLITE_STATIC);
                 rc = sqlite3_step(stmt);
                 sqlite3_finalize(stmt);
 
-                // Remove request from pending_requests
-                snprintf(sql, sizeof(sql), "DELETE FROM pending_requests WHERE room_name = ? AND username = ?;");
+                snprintf(sql, sizeof(sql), "DELETE FROM pending_requests WHERE LOWER(room_name) = LOWER(?) AND username = ?;");
                 rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
                 if (rc != SQLITE_OK || stmt == NULL) {
                     fprintf(stderr, "Failed to remove pending request: %s\n", sqlite3_errmsg(db));
@@ -951,22 +947,21 @@ void *handle_client(void *arg) {
                 }
 
                 char msg[64];
-                snprintf(msg, sizeof(msg), "[Server] Accepted '%s' into room '%s'.\n", username, room_name);
+                snprintf(msg, sizeof(msg), "[Server] Accepted '%s' into room '%s'.\n", username, original_room_name);
                 if (cli->sockfd > 0) {
                     send(cli->sockfd, msg, strlen(msg), 0);
                 }
 
-                // Notify the user
                 pthread_mutex_lock(&clients_mutex);
                 for (int i = 0; i < MAX_CLIENTS; ++i) {
                     if (clients[i] && strcmp(clients[i]->name, username) == 0) {
-                        snprintf(msg, sizeof(msg), "[Server] Your join request for room '%s' has been accepted.\n", room_name);
+                        snprintf(msg, sizeof(msg), "[Server] Your join request for room '%s' has been accepted.\n", original_room_name);
                         if (clients[i]->sockfd > 0) {
                             send(clients[i]->sockfd, msg, strlen(msg), 0);
                         }
-                        strcpy(clients[i]->current_room, room_name);
-                        send_history_to_client(clients[i]->sockfd, room_name);
-                        usleep(500000); // Thêm thời gian chờ để đồng bộ
+                        strcpy(clients[i]->current_room, original_room_name);
+                        send_history_to_client(clients[i]->sockfd, original_room_name);
+                        usleep(500000);
                         break;
                     }
                 }
@@ -977,15 +972,25 @@ void *handle_client(void *arg) {
             if (strncmp(buff_out, "/reject ", 8) == 0) {
                 char room_name[32] = {0}, username[32];
                 sscanf(buff_out + 8, "%s %s", room_name, username);
-                to_lowercase(room_name); // Chuyển tên phòng thành chữ thường
                 fprintf(stderr, "User '%s' rejecting '%s' from room '%s'\n", cli->name, username, room_name);
 
-                // Check if user is a member of the room
-                char sql[BUFFER_SZ];
-                snprintf(sql, sizeof(sql), "SELECT username FROM room_members WHERE room_name = ? AND username = ?;");
-                sqlite3_stmt *stmt = NULL;
+                char original_room_name[32] = {0};
                 pthread_mutex_lock(&db_mutex);
+                char sql[BUFFER_SZ];
+                snprintf(sql, sizeof(sql), "SELECT name FROM rooms WHERE LOWER(name) = LOWER(?);");
+                sqlite3_stmt *stmt = NULL;
                 int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+                if (rc == SQLITE_OK && stmt != NULL) {
+                    sqlite3_bind_text(stmt, 1, room_name, -1, SQLITE_STATIC);
+                    if (sqlite3_step(stmt) == SQLITE_ROW) {
+                        const char *name = (const char *)sqlite3_column_text(stmt, 0);
+                        strncpy(original_room_name, name, sizeof(original_room_name) - 1);
+                    }
+                }
+                sqlite3_finalize(stmt);
+
+                snprintf(sql, sizeof(sql), "SELECT username FROM room_members WHERE LOWER(room_name) = LOWER(?) AND username = ?;");
+                rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
                 if (rc != SQLITE_OK || stmt == NULL) {
                     fprintf(stderr, "Failed to check room membership: %s\n", sqlite3_errmsg(db));
                     pthread_mutex_unlock(&db_mutex);
@@ -1011,8 +1016,7 @@ void *handle_client(void *arg) {
                     continue;
                 }
 
-                // Check if request exists
-                snprintf(sql, sizeof(sql), "SELECT username FROM pending_requests WHERE room_name = ? AND username = ?;");
+                snprintf(sql, sizeof(sql), "SELECT username FROM pending_requests WHERE LOWER(room_name) = LOWER(?) AND username = ?;");
                 rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
                 if (rc != SQLITE_OK || stmt == NULL) {
                     fprintf(stderr, "Failed to check pending request: %s\n", sqlite3_errmsg(db));
@@ -1039,8 +1043,7 @@ void *handle_client(void *arg) {
                     continue;
                 }
 
-                // Remove request from pending_requests
-                snprintf(sql, sizeof(sql), "DELETE FROM pending_requests WHERE room_name = ? AND username = ?;");
+                snprintf(sql, sizeof(sql), "DELETE FROM pending_requests WHERE LOWER(room_name) = LOWER(?) AND username = ?;");
                 rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
                 if (rc != SQLITE_OK || stmt == NULL) {
                     fprintf(stderr, "Failed to remove pending request: %s\n", sqlite3_errmsg(db));
@@ -1068,16 +1071,15 @@ void *handle_client(void *arg) {
                 }
 
                 char msg[64];
-                snprintf(msg, sizeof(msg), "[Server] Rejected '%s' from joining room '%s'.\n", username, room_name);
+                snprintf(msg, sizeof(msg), "[Server] Rejected '%s' from joining room '%s'.\n", username, original_room_name);
                 if (cli->sockfd > 0) {
                     send(cli->sockfd, msg, strlen(msg), 0);
                 }
 
-                // Notify the user
                 pthread_mutex_lock(&clients_mutex);
                 for (int i = 0; i < MAX_CLIENTS; ++i) {
                     if (clients[i] && strcmp(clients[i]->name, username) == 0) {
-                        snprintf(msg, sizeof(msg), "[Server] Your join request for room '%s' has been rejected.\n", room_name);
+                        snprintf(msg, sizeof(msg), "[Server] Your join request for room '%s' has been rejected.\n", original_room_name);
                         if (clients[i]->sockfd > 0) {
                             send(clients[i]->sockfd, msg, strlen(msg), 0);
                         }
@@ -1089,24 +1091,20 @@ void *handle_client(void *arg) {
             }
 
             if (strcmp(buff_out, "/leave") == 0) {
-                // Thông báo đến các client khác trong cùng room trước khi rời
                 char leave_msg[BUFFER_SZ];
                 snprintf(leave_msg, sizeof(leave_msg), "[Server] %s has left room '%s'.\n", cli->name, cli->current_room);
-                send_message(leave_msg, cli->uid); // Gửi thông báo đến các client trong cùng room
-            
-                // Xóa room hiện tại của client
+                send_message(leave_msg, cli->uid);
+
                 cli->current_room[0] = '\0';
-            
-                // Gửi thông báo rời room đến chính client
                 char msg[64];
                 snprintf(msg, sizeof(msg), "[Server] Left room.\n");
                 if (cli->sockfd > 0) {
                     send(cli->sockfd, msg, strlen(msg), 0);
                 }
-            
+
                 fprintf(stderr, "Sending public room history to user '%s'\n", cli->name);
                 send_history_to_client(cli->sockfd, "");
-                usleep(500000); // Thêm thời gian chờ để đồng bộ
+                usleep(500000);
                 continue;
             }
 
@@ -1114,22 +1112,18 @@ void *handle_client(void *arg) {
                 char room_list[BUFFER_SZ] = "[Server] Room Information:\n";
                 int has_rooms = 0;
 
-                // Show current room
                 char current_room_info[64];
                 snprintf(current_room_info, sizeof(current_room_info), "You are in: %s\n",
                          cli->current_room[0] == '\0' ? "public" : cli->current_room);
                 strcat(room_list, current_room_info);
 
-                // List all rooms
                 strcat(room_list, "All rooms:\n");
 
-                // Add public room
                 snprintf(current_room_info, sizeof(current_room_info), "  public (%s)\n",
                          cli->current_room[0] == '\0' ? "joined" : "not joined");
                 strcat(room_list, current_room_info);
                 has_rooms = 1;
 
-                // Get rooms the user is a member of
                 char member_rooms[BUFFER_SZ] = {0};
                 char sql[BUFFER_SZ];
                 snprintf(sql, sizeof(sql), "SELECT room_name FROM room_members WHERE username = ?;");
@@ -1156,7 +1150,6 @@ void *handle_client(void *arg) {
                 }
                 sqlite3_finalize(stmt);
 
-                // Get all private rooms
                 snprintf(sql, sizeof(sql), "SELECT name FROM rooms;");
                 rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
                 if (rc != SQLITE_OK || stmt == NULL) {
@@ -1201,9 +1194,9 @@ void *handle_client(void *arg) {
             char ts[64];
             strftime(ts, sizeof(ts), "[%Y-%m-%d %H:%M:%S]", t);
 
-            char msg[BUFFER_SZ + 100] = {0}; // Khởi tạo để tránh rác
+            char msg[BUFFER_SZ + 100] = {0};
             snprintf(msg, sizeof(msg), "%s %s: %s\n", ts, cli->name, buff_out);
-            fprintf(stderr, "Sending message: %s", msg); // Log để debug
+            fprintf(stderr, "Sending message: %s", msg);
             send_message(msg, cli->uid);
             save_message_to_history(cli->current_room, cli->name, buff_out);
             printf("%s", msg);
@@ -1211,6 +1204,9 @@ void *handle_client(void *arg) {
             sprintf(buff_out, "[Server] %s has left\n", cli->name);
             printf("%s", buff_out);
             broadcast_status(buff_out);
+            leave_flag = 1;
+        } else {
+            printf("ERROR: -1\n");
             leave_flag = 1;
         }
     }
@@ -1220,6 +1216,7 @@ void *handle_client(void *arg) {
     free(cli);
     cli_count--;
     pthread_detach(pthread_self());
+
     return NULL;
 }
 
@@ -1229,55 +1226,64 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
+    char *port = argv[1];
+    struct sockaddr_in server_addr;
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd == -1) {
+        printf("ERROR: socket creation failed\n");
+        return EXIT_FAILURE;
+    }
+
+    int optval = 1;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0) {
+        printf("ERROR: setsockopt failed\n");
+        return EXIT_FAILURE;
+    }
+
+    bzero(&server_addr, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    server_addr.sin_port = htons(atoi(port));
+
+    if (bind(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) != 0) {
+        printf("ERROR: bind failed\n");
+        return EXIT_FAILURE;
+    }
+
+    if (listen(sockfd, 10) != 0) {
+        printf("ERROR: listen failed\n");
+        return EXIT_FAILURE;
+    }
+
+    printf("=== WELCOME TO THE CHATROOM ===\n");
+
     if (!init_database()) {
-        fprintf(stderr, "Failed to initialize database\n");
+        printf("ERROR: Database initialization failed\n");
         return EXIT_FAILURE;
     }
-
-    int port = atoi(argv[1]);
-    int option = 1;
-    int listenfd = 0, connfd = 0;
-    struct sockaddr_in serv_addr, cli_addr;
-    pthread_t tid;
-
-    signal(SIGPIPE, SIG_IGN);
-    listenfd = socket(AF_INET, SOCK_STREAM, 0);
-    setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
-
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = INADDR_ANY;
-    serv_addr.sin_port = htons(port);
-
-    if (bind(listenfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
-        perror("Bind failed");
-        sqlite3_close(db);
-        return EXIT_FAILURE;
-    }
-
-    if (listen(listenfd, 10) < 0) {
-        perror("Listen failed");
-        sqlite3_close(db);
-        return EXIT_FAILURE;
-    }
-
-    printf("=== CHATROOM SERVER STARTED ===\n");
 
     while (1) {
-        socklen_t clilen = sizeof(cli_addr);
-        connfd = accept(listenfd, (struct sockaddr*)&cli_addr, &clilen);
+        struct sockaddr_in client_addr;
+        socklen_t client_len = sizeof(client_addr);
+        int connfd = accept(sockfd, (struct sockaddr*)&client_addr, &client_len);
+        if (connfd < 0) {
+            perror("ERROR: accept failed");
+            continue;
+        }
 
-        if ((cli_count + 1) > MAX_CLIENTS) {
-            printf("Max clients. Connection rejected.\n");
+        if (cli_count >= MAX_CLIENTS) {
+            printf("Max clients reached. Connection rejected: %d\n", connfd);
             close(connfd);
             continue;
         }
 
         client_t *cli = (client_t *)malloc(sizeof(client_t));
-        cli->address = cli_addr;
+        cli->address = client_addr;
         cli->sockfd = connfd;
         cli->uid = uid++;
 
         queue_add(cli);
+        pthread_t tid;
         pthread_create(&tid, NULL, &handle_client, (void*)cli);
     }
 
