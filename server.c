@@ -143,25 +143,13 @@ void queue_remove(int uid) {
     pthread_mutex_unlock(&clients_mutex);
 }
 
-void send_message(char *s, int uid) {
-    client_t *sender = NULL;
-
+void send_message_to_room(const char *room_name, const char *msg, int exclude_uid) {
     pthread_mutex_lock(&clients_mutex);
     for (int i = 0; i < MAX_CLIENTS; ++i) {
-        if (clients[i] && clients[i]->uid == uid) {
-            sender = clients[i];
-            break;
-        }
-    }
-
-    for (int i = 0; i < MAX_CLIENTS; ++i) {
-        if (clients[i] && clients[i]->uid != uid) {
-            if (strcmp(clients[i]->current_room, sender->current_room) == 0) {
-                if (clients[i]->sockfd > 0) {
-                    if (write(clients[i]->sockfd, s, strlen(s)) < 0) {
-                        perror("ERROR: write failed");
-                        break;
-                    }
+        if (clients[i] && clients[i]->uid != exclude_uid && strcmp(clients[i]->current_room, room_name) == 0) {
+            if (clients[i]->sockfd > 0) {
+                if (write(clients[i]->sockfd, msg, strlen(msg)) < 0) {
+                    perror("ERROR: write failed");
                 }
             }
         }
@@ -732,6 +720,8 @@ void *handle_client(void *arg) {
                     if (cli->sockfd > 0) {
                         send(cli->sockfd, msg, strlen(msg), 0);
                     }
+                    snprintf(msg, sizeof(msg), "[Server] %s has joined room '%s'.\n", cli->name, original_room_name);
+                    send_message_to_room(original_room_name, msg, cli->uid);
                     fprintf(stderr, "Sending history for room '%s' to user '%s'\n", original_room_name, cli->name);
                     send_history_to_client(cli->sockfd, original_room_name);
                     usleep(500000);
@@ -958,6 +948,7 @@ void *handle_client(void *arg) {
                     send(cli->sockfd, msg, strlen(msg), 0);
                 }
 
+                int joined_uid = -1;
                 pthread_mutex_lock(&clients_mutex);
                 for (int i = 0; i < MAX_CLIENTS; ++i) {
                     if (clients[i] && strcmp(clients[i]->name, username) == 0) {
@@ -966,12 +957,16 @@ void *handle_client(void *arg) {
                             send(clients[i]->sockfd, msg, strlen(msg), 0);
                         }
                         strcpy(clients[i]->current_room, original_room_name);
+                        joined_uid = clients[i]->uid;
                         send_history_to_client(clients[i]->sockfd, original_room_name);
                         usleep(500000);
                         break;
                     }
                 }
                 pthread_mutex_unlock(&clients_mutex);
+
+                snprintf(msg, sizeof(msg), "[Server] %s has joined room '%s'.\n", username, original_room_name);
+                send_message_to_room(original_room_name, msg, joined_uid);
                 continue;
             }
 
@@ -1104,7 +1099,6 @@ void *handle_client(void *arg) {
                 char original_room_name[32] = {0};
                 pthread_mutex_lock(&db_mutex);
                 char sql[BUFFER_SZ];
-                // Kiểm tra phòng có tồn tại và lấy tên phòng gốc
                 snprintf(sql, sizeof(sql), "SELECT name, created_by FROM rooms WHERE LOWER(name) = LOWER(?);");
                 sqlite3_stmt *stmt = NULL;
                 int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
@@ -1139,7 +1133,6 @@ void *handle_client(void *arg) {
                 }
                 sqlite3_finalize(stmt);
 
-                // Kiểm tra xem người dùng có phải là người tạo phòng
                 if (!is_creator) {
                     pthread_mutex_unlock(&db_mutex);
                     char msg[64];
@@ -1150,7 +1143,6 @@ void *handle_client(void *arg) {
                     continue;
                 }
 
-                // Kiểm tra xem người dùng cần xóa có trong phòng không
                 snprintf(sql, sizeof(sql), "SELECT username FROM room_members WHERE LOWER(room_name) = LOWER(?) AND username = ?;");
                 rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
                 if (rc != SQLITE_OK || stmt == NULL) {
@@ -1178,7 +1170,6 @@ void *handle_client(void *arg) {
                     continue;
                 }
 
-                // Không cho phép tự xóa chính mình
                 if (strcmp(username, cli->name) == 0) {
                     pthread_mutex_unlock(&db_mutex);
                     char msg[64];
@@ -1189,7 +1180,6 @@ void *handle_client(void *arg) {
                     continue;
                 }
 
-                // Xóa người dùng khỏi phòng
                 snprintf(sql, sizeof(sql), "DELETE FROM room_members WHERE LOWER(room_name) = LOWER(?) AND username = ?;");
                 rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
                 if (rc != SQLITE_OK || stmt == NULL) {
@@ -1217,29 +1207,24 @@ void *handle_client(void *arg) {
                     continue;
                 }
 
-                // Gửi thông báo đến người thực hiện lệnh
                 char msg[64];
                 snprintf(msg, sizeof(msg), "[Server] Kicked '%s' from room '%s'.\n", username, original_room_name);
                 if (cli->sockfd > 0) {
                     send(cli->sockfd, msg, strlen(msg), 0);
                 }
 
-                // Gửi thông báo đến các thành viên trong phòng và người bị xóa
                 pthread_mutex_lock(&clients_mutex);
                 for (int i = 0; i < MAX_CLIENTS; ++i) {
                     if (clients[i]) {
                         if (strcmp(clients[i]->name, username) == 0) {
-                            // Thông báo cho người bị xóa
                             snprintf(msg, sizeof(msg), "[Server] You have been kicked from room '%s'.\n", original_room_name);
                             if (clients[i]->sockfd > 0) {
                                 send(clients[i]->sockfd, msg, strlen(msg), 0);
                             }
-                            // Chuyển người bị xóa về phòng công khai
                             clients[i]->current_room[0] = '\0';
                             send_history_to_client(clients[i]->sockfd, "");
                             usleep(500000);
                         } else if (strcmp(clients[i]->current_room, original_room_name) == 0) {
-                            // Thông báo cho các thành viên khác trong phòng
                             snprintf(msg, sizeof(msg), "[Server] %s has been kicked from room '%s'.\n", username, original_room_name);
                             if (clients[i]->sockfd > 0) {
                                 send(clients[i]->sockfd, msg, strlen(msg), 0);
@@ -1254,7 +1239,7 @@ void *handle_client(void *arg) {
             if (strcmp(buff_out, "/leave") == 0) {
                 char leave_msg[BUFFER_SZ];
                 snprintf(leave_msg, sizeof(leave_msg), "[Server] %s has left room '%s'.\n", cli->name, cli->current_room);
-                send_message(leave_msg, cli->uid);
+                send_message_to_room(cli->current_room, leave_msg, cli->uid);
 
                 cli->current_room[0] = '\0';
                 char msg[64];
@@ -1351,17 +1336,19 @@ void *handle_client(void *arg) {
                 continue;
             }
 
-            time_t now = time(NULL);
-            struct tm *t = localtime(&now);
-            char ts[64];
-            strftime(ts, sizeof(ts), "[%Y-%m-%d %H:%M:%S]", t);
+            if (strncmp(buff_out, "/", 1) != 0) { // Chỉ xử lý tin nhắn không phải lệnh
+                time_t now = time(NULL);
+                struct tm *t = localtime(&now);
+                char ts[64];
+                strftime(ts, sizeof(ts), "[%Y-%m-%d %H:%M:%S]", t);
 
-            char msg[BUFFER_SZ + 100] = {0};
-            snprintf(msg, sizeof(msg), "%s %s: %s\n", ts, cli->name, buff_out);
-            fprintf(stderr, "Sending message: %s", msg);
-            send_message(msg, cli->uid);
-            save_message_to_history(cli->current_room, cli->name, buff_out);
-            printf("%s", msg);
+                char msg[BUFFER_SZ + 100] = {0};
+                snprintf(msg, sizeof(msg), "%s %s: %s\n", ts, cli->name, buff_out);
+                fprintf(stderr, "Sending message to room '%s' (excluding uid %d): %s", cli->current_room, cli->uid, msg);
+                send_message_to_room(cli->current_room, msg, cli->uid); // Loại trừ client gửi tin nhắn
+                save_message_to_history(cli->current_room, cli->name, buff_out);
+                printf("%s", msg);
+            }
         } else if (receive == 0 || strcmp(buff_out, "exit") == 0) {
             sprintf(buff_out, "[Server] %s has left\n", cli->name);
             printf("%s", buff_out);
