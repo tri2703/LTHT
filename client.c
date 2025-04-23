@@ -36,7 +36,6 @@ void catch_ctrl_c_and_exit(int sig) {
     flag = 1;
 }
 
-// Hàm xử lý định dạng tin nhắn và emoji
 void format_message(char *input, char *output, int max_len) {
     char *pos = input;
     char *out = output;
@@ -44,7 +43,6 @@ void format_message(char *input, char *output, int max_len) {
 
     while (*pos && out_len < max_len - 10) {
         if (*pos == '*' && *(pos + 1) != '*' && *(pos + 1) != '\0') {
-            // Bắt đầu in đậm
             if (strncmp(pos, "*text*", 6) != 0) {
                 strcpy(out + out_len, "\033[1m");
                 out_len += strlen("\033[1m");
@@ -60,7 +58,6 @@ void format_message(char *input, char *output, int max_len) {
                 continue;
             }
         } else if (*pos == '_' && *(pos + 1) != '_' && *(pos + 1) != '\0') {
-            // Bắt đầu in nghiêng
             strcpy(out + out_len, "\033[3m");
             out_len += strlen("\033[3m");
             pos++;
@@ -74,13 +71,11 @@ void format_message(char *input, char *output, int max_len) {
             }
             continue;
         } else if (*pos == ':' && strncmp(pos, ":smile:", 7) == 0) {
-            // Emoji smile
             strcpy(out + out_len, "😊");
             out_len += strlen("😊");
             pos += 7;
             continue;
         } else if (*pos == ':' && strncmp(pos, ":heart:", 7) == 0) {
-            // Emoji heart
             strcpy(out + out_len, "❤️");
             out_len += strlen("❤️");
             pos += 7;
@@ -107,16 +102,15 @@ void send_msg_handler() {
 
         if (strlen(message) == 0) continue;
 
-        // Handle exit
         if (strcmp(message, "exit") == 0) break;
 
-        // Handle local commands
         if (strcmp(message, "/help") == 0) {
             printf("Available commands:\n");
             printf("  /create <room> <user1> <user2> ... : Create private room\n");
             printf("  /join <room>                     : Send request to join a private room\n");
-            printf("  /accept <room> <user>            : Accept a user's join request (admin only)\n");
-            printf("  /reject <room> <user>            : Reject a user's join request (admin only)\n");
+            printf("  /accept <room> <user>            : Accept a user's join request (room creator only)\n");
+            printf("  /reject <room> <user>            : Reject a user's join request (room creator only)\n");
+            printf("  /kick <room> <user>              : Kick a user from the room (room creator only)\n");
             printf("  /leave                           : Leave current room\n");
             printf("  /rooms                           : List available rooms\n");
             printf("  /online                          : List online users\n");
@@ -129,7 +123,6 @@ void send_msg_handler() {
             continue;
         }
 
-        // Send command or message to server
         snprintf(buffer, sizeof(buffer), "%s", message);
         send(sockfd, buffer, strlen(buffer), 0);
 
@@ -154,7 +147,6 @@ void recv_msg_handler() {
         if (receive > 0) {
             message[receive] = '\0';
 
-            // Log received message
             if (log_file) {
                 fprintf(log_file, "Received: %s", message);
                 fflush(log_file);
@@ -167,11 +159,10 @@ void recv_msg_handler() {
                 is_blocked = 0;
                 printf("\033[1;32m%s\033[0m", message);
             } else {
-                // Xử lý định dạng tin nhắn
                 format_message(message, formatted_message, LENGTH + 100);
                 printf("%s", formatted_message);
             }
-            fflush(stdout); // Ensure message is displayed immediately
+            fflush(stdout);
             str_overwrite_stdout();
         } else if (receive == 0) {
             break;

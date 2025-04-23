@@ -1096,6 +1096,161 @@ void *handle_client(void *arg) {
                 continue;
             }
 
+            if (strncmp(buff_out, "/kick ", 6) == 0) {
+                char room_name[32] = {0}, username[32];
+                sscanf(buff_out + 6, "%s %s", room_name, username);
+                fprintf(stderr, "User '%s' attempting to kick '%s' from room '%s'\n", cli->name, username, room_name);
+
+                char original_room_name[32] = {0};
+                pthread_mutex_lock(&db_mutex);
+                char sql[BUFFER_SZ];
+                // Kiểm tra phòng có tồn tại và lấy tên phòng gốc
+                snprintf(sql, sizeof(sql), "SELECT name, created_by FROM rooms WHERE LOWER(name) = LOWER(?);");
+                sqlite3_stmt *stmt = NULL;
+                int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+                if (rc != SQLITE_OK || stmt == NULL) {
+                    fprintf(stderr, "Failed to check room existence: %s\n", sqlite3_errmsg(db));
+                    pthread_mutex_unlock(&db_mutex);
+                    char msg[64];
+                    snprintf(msg, sizeof(msg), "[Server] Database error.\n");
+                    if (cli->sockfd > 0) {
+                        send(cli->sockfd, msg, strlen(msg), 0);
+                    }
+                    continue;
+                }
+                sqlite3_bind_text(stmt, 1, room_name, -1, SQLITE_STATIC);
+                int is_creator = 0;
+                if (sqlite3_step(stmt) == SQLITE_ROW) {
+                    const char *name = (const char *)sqlite3_column_text(stmt, 0);
+                    const char *creator = (const char *)sqlite3_column_text(stmt, 1);
+                    strncpy(original_room_name, name, sizeof(original_room_name) - 1);
+                    if (strcmp(creator, cli->name) == 0) {
+                        is_creator = 1;
+                    }
+                } else {
+                    sqlite3_finalize(stmt);
+                    pthread_mutex_unlock(&db_mutex);
+                    char msg[64];
+                    snprintf(msg, sizeof(msg), "[Server] Room '%s' does not exist.\n", room_name);
+                    if (cli->sockfd > 0) {
+                        send(cli->sockfd, msg, strlen(msg), 0);
+                    }
+                    continue;
+                }
+                sqlite3_finalize(stmt);
+
+                // Kiểm tra xem người dùng có phải là người tạo phòng
+                if (!is_creator) {
+                    pthread_mutex_unlock(&db_mutex);
+                    char msg[64];
+                    snprintf(msg, sizeof(msg), "[Server] Only the room creator can kick users from '%s'.\n", room_name);
+                    if (cli->sockfd > 0) {
+                        send(cli->sockfd, msg, strlen(msg), 0);
+                    }
+                    continue;
+                }
+
+                // Kiểm tra xem người dùng cần xóa có trong phòng không
+                snprintf(sql, sizeof(sql), "SELECT username FROM room_members WHERE LOWER(room_name) = LOWER(?) AND username = ?;");
+                rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+                if (rc != SQLITE_OK || stmt == NULL) {
+                    fprintf(stderr, "Failed to check room membership: %s\n", sqlite3_errmsg(db));
+                    pthread_mutex_unlock(&db_mutex);
+                    char msg[64];
+                    snprintf(msg, sizeof(msg), "[Server] Database error.\n");
+                    if (cli->sockfd > 0) {
+                        send(cli->sockfd, msg, strlen(msg), 0);
+                    }
+                    continue;
+                }
+                sqlite3_bind_text(stmt, 1, room_name, -1, SQLITE_STATIC);
+                sqlite3_bind_text(stmt, 2, username, -1, SQLITE_STATIC);
+                int is_member = (sqlite3_step(stmt) == SQLITE_ROW);
+                sqlite3_finalize(stmt);
+
+                if (!is_member) {
+                    pthread_mutex_unlock(&db_mutex);
+                    char msg[64];
+                    snprintf(msg, sizeof(msg), "[Server] User '%s' is not a member of room '%s'.\n", username, room_name);
+                    if (cli->sockfd > 0) {
+                        send(cli->sockfd, msg, strlen(msg), 0);
+                    }
+                    continue;
+                }
+
+                // Không cho phép tự xóa chính mình
+                if (strcmp(username, cli->name) == 0) {
+                    pthread_mutex_unlock(&db_mutex);
+                    char msg[64];
+                    snprintf(msg, sizeof(msg), "[Server] You cannot kick yourself from room '%s'.\n", room_name);
+                    if (cli->sockfd > 0) {
+                        send(cli->sockfd, msg, strlen(msg), 0);
+                    }
+                    continue;
+                }
+
+                // Xóa người dùng khỏi phòng
+                snprintf(sql, sizeof(sql), "DELETE FROM room_members WHERE LOWER(room_name) = LOWER(?) AND username = ?;");
+                rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+                if (rc != SQLITE_OK || stmt == NULL) {
+                    fprintf(stderr, "Failed to remove user from room: %s\n", sqlite3_errmsg(db));
+                    pthread_mutex_unlock(&db_mutex);
+                    char msg[64];
+                    snprintf(msg, sizeof(msg), "[Server] Database error.\n");
+                    if (cli->sockfd > 0) {
+                        send(cli->sockfd, msg, strlen(msg), 0);
+                    }
+                    continue;
+                }
+                sqlite3_bind_text(stmt, 1, room_name, -1, SQLITE_STATIC);
+                sqlite3_bind_text(stmt, 2, username, -1, SQLITE_STATIC);
+                rc = sqlite3_step(stmt);
+                sqlite3_finalize(stmt);
+                pthread_mutex_unlock(&db_mutex);
+
+                if (rc != SQLITE_DONE) {
+                    char msg[64];
+                    snprintf(msg, sizeof(msg), "[Server] Failed to kick user '%s' from room '%s'.\n", username, room_name);
+                    if (cli->sockfd > 0) {
+                        send(cli->sockfd, msg, strlen(msg), 0);
+                    }
+                    continue;
+                }
+
+                // Gửi thông báo đến người thực hiện lệnh
+                char msg[64];
+                snprintf(msg, sizeof(msg), "[Server] Kicked '%s' from room '%s'.\n", username, original_room_name);
+                if (cli->sockfd > 0) {
+                    send(cli->sockfd, msg, strlen(msg), 0);
+                }
+
+                // Gửi thông báo đến các thành viên trong phòng và người bị xóa
+                pthread_mutex_lock(&clients_mutex);
+                for (int i = 0; i < MAX_CLIENTS; ++i) {
+                    if (clients[i]) {
+                        if (strcmp(clients[i]->name, username) == 0) {
+                            // Thông báo cho người bị xóa
+                            snprintf(msg, sizeof(msg), "[Server] You have been kicked from room '%s'.\n", original_room_name);
+                            if (clients[i]->sockfd > 0) {
+                                send(clients[i]->sockfd, msg, strlen(msg), 0);
+                            }
+                            // Chuyển người bị xóa về phòng công khai
+                            clients[i]->current_room[0] = '\0';
+                            send_history_to_client(clients[i]->sockfd, "");
+                            usleep(500000);
+                        } else if (strcmp(clients[i]->current_room, original_room_name) == 0) {
+                            // Thông báo cho các thành viên khác trong phòng
+                            snprintf(msg, sizeof(msg), "[Server] %s has been kicked from room '%s'.\n", username, original_room_name);
+                            if (clients[i]->sockfd > 0) {
+                                send(clients[i]->sockfd, msg, strlen(msg), 0);
+                            }
+                        }
+                    }
+                }
+                pthread_mutex_unlock(&clients_mutex);
+                continue;
+            }
+
             if (strcmp(buff_out, "/leave") == 0) {
                 char leave_msg[BUFFER_SZ];
                 snprintf(leave_msg, sizeof(leave_msg), "[Server] %s has left room '%s'.\n", cli->name, cli->current_room);
