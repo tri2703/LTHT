@@ -164,22 +164,32 @@ void send_message_to_room(const char *room_name, const char *msg, int exclude_ui
 }
 
 void send_online_users(int sockfd) {
-    char user_list[BUFFER_SZ] = "[Server] Online users:\n";
-    int has_users = 0;
-
+    client_t *requesting_client = NULL;
     pthread_mutex_lock(&clients_mutex);
     for (int i = 0; i < MAX_CLIENTS; ++i) {
-        if (clients[i]) {
-            char user_info[64];
-            snprintf(user_info, sizeof(user_info), "  %s\n", clients[i]->name);
-            strcat(user_list, user_info);
-            has_users = 1;
+        if (clients[i] && clients[i]->sockfd == sockfd) {
+            requesting_client = clients[i];
+            break;
+        }
+    }
+
+    char user_list[BUFFER_SZ] = "[Server] Online users in your room:\n";
+    int has_users = 0;
+
+    if (requesting_client) {
+        for (int i = 0; i < MAX_CLIENTS; ++i) {
+            if (clients[i] && strcmp(clients[i]->current_room, requesting_client->current_room) == 0) {
+                char user_info[64];
+                snprintf(user_info, sizeof(user_info), "  %s\n", clients[i]->name);
+                strcat(user_list, user_info);
+                has_users = 1;
+            }
         }
     }
     pthread_mutex_unlock(&clients_mutex);
 
     if (!has_users) {
-        strcat(user_list, "  (No users online)\n");
+        strcat(user_list, "  (No users in your room)\n");
     }
     if (sockfd > 0) {
         send(sockfd, user_list, strlen(user_list), 0);
