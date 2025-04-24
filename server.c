@@ -148,7 +148,13 @@ void send_message_to_room(const char *room_name, const char *msg, int exclude_ui
     for (int i = 0; i < MAX_CLIENTS; ++i) {
         if (clients[i] && clients[i]->uid != exclude_uid && strcmp(clients[i]->current_room, room_name) == 0) {
             if (clients[i]->sockfd > 0) {
-                if (write(clients[i]->sockfd, msg, strlen(msg)) < 0) {
+                char formatted_msg[BUFFER_SZ + 100];
+                if (room_name[0] == '\0') {
+                    snprintf(formatted_msg, sizeof(formatted_msg), "%s", msg);
+                } else {
+                    snprintf(formatted_msg, sizeof(formatted_msg), "[%s] %s", room_name, msg);
+                }
+                if (write(clients[i]->sockfd, formatted_msg, strlen(formatted_msg)) < 0) {
                     perror("ERROR: write failed");
                 }
             }
@@ -399,7 +405,11 @@ void send_history_to_client(int sockfd, const char *room) {
         const char *message = (const char *)sqlite3_column_text(stmt, 2);
 
         char line[BUFFER_SZ];
-        snprintf(line, sizeof(line), "[%s] %s: %s\n", ts, username, message);
+        if (room[0] == '\0') {
+            snprintf(line, sizeof(line), "[%s] %s: %s\n", ts, username, message);
+        } else {
+            snprintf(line, sizeof(line), "[%s] [%s] %s: %s\n", room, ts, username, message);
+        }
         if (sockfd > 0) {
             if (send(sockfd, line, strlen(line), 0) <= 0) {
                 fprintf(stderr, "Failed to send history message to client for room '%s': %s\n", room, line);
@@ -1336,7 +1346,7 @@ void *handle_client(void *arg) {
                 continue;
             }
 
-            if (strncmp(buff_out, "/", 1) != 0) { // Chỉ xử lý tin nhắn không phải lệnh
+            if (strncmp(buff_out, "/", 1) != 0) {
                 time_t now = time(NULL);
                 struct tm *t = localtime(&now);
                 char ts[64];
@@ -1345,7 +1355,7 @@ void *handle_client(void *arg) {
                 char msg[BUFFER_SZ + 100] = {0};
                 snprintf(msg, sizeof(msg), "%s %s: %s\n", ts, cli->name, buff_out);
                 fprintf(stderr, "Sending message to room '%s' (excluding uid %d): %s", cli->current_room, cli->uid, msg);
-                send_message_to_room(cli->current_room, msg, cli->uid); // Loại trừ client gửi tin nhắn
+                send_message_to_room(cli->current_room, msg, cli->uid);
                 save_message_to_history(cli->current_room, cli->name, buff_out);
                 printf("%s", msg);
             }
