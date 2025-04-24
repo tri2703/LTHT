@@ -1276,7 +1276,7 @@ void *handle_client(void *arg) {
                 strcat(room_list, "All rooms:\n");
 
                 snprintf(current_room_info, sizeof(current_room_info), "  public (%s)\n",
-                         cli->current_room[0] == '\0' ? "joined" : "not joined");
+                         cli->current_room[0] == '\0' ? "member" : "not member");
                 strcat(room_list, current_room_info);
                 has_rooms = 1;
 
@@ -1325,7 +1325,7 @@ void *handle_client(void *arg) {
                     int is_member = (strstr(member_rooms, name) != NULL);
                     int is_current = (strcmp(name, cli->current_room) == 0);
                     snprintf(room_info, sizeof(room_info), "  %s (%s, created by %s)\n", name,
-                             is_current ? "joined" : (is_member ? "joined" : "not joined"), creator);
+                             is_current ? "member" : (is_member ? "member" : "not member"), creator);
                     strcat(room_list, room_info);
                     has_rooms = 1;
                 }
