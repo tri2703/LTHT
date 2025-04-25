@@ -472,7 +472,7 @@ void *handle_client(void *arg) {
 
                 sprintf(buff_out, "[Server] %s has joined\n", cli->name);
                 printf("%s", buff_out);
-                broadcast_status(buff_out);
+                send_message_to_room("", buff_out, cli->uid); // Notify public room
                 send_online_users(cli->sockfd);
             } else {
                 if (cli->sockfd > 0) {
@@ -488,7 +488,7 @@ void *handle_client(void *arg) {
                 }
                 sprintf(buff_out, "[Server] %s has registered and joined\n", cli->name);
                 printf("%s", buff_out);
-                broadcast_status(buff_out);
+                send_message_to_room("", buff_out, cli->uid); // Notify public room
                 send_online_users(cli->sockfd);
             } else {
                 if (cli->sockfd > 0) {
@@ -1370,14 +1370,33 @@ void *handle_client(void *arg) {
                 printf("%s", msg);
             }
         } else if (receive == 0 || strcmp(buff_out, "exit") == 0) {
+            // Notify clients in the current room (public or private) before disconnecting
             sprintf(buff_out, "[Server] %s has left\n", cli->name);
             printf("%s", buff_out);
-            broadcast_status(buff_out);
+            send_message_to_room(cli->current_room, buff_out, cli->uid); // Notify the current room
             leave_flag = 1;
         } else {
             printf("ERROR: -1\n");
             leave_flag = 1;
         }
+    }
+
+    // Remove the client from the room in the database if they were in a private room
+    if (cli->current_room[0] != '\0') {
+        pthread_mutex_lock(&db_mutex);
+        char sql[BUFFER_SZ];
+        snprintf(sql, sizeof(sql), "DELETE FROM room_members WHERE room_name = ? AND username = ?;");
+        sqlite3_stmt *stmt = NULL;
+        int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+        if (rc == SQLITE_OK && stmt != NULL) {
+            sqlite3_bind_text(stmt, 1, cli->current_room, -1, SQLITE_STATIC);
+            sqlite3_bind_text(stmt, 2, cli->name, -1, SQLITE_STATIC);
+            sqlite3_step(stmt);
+            sqlite3_finalize(stmt);
+        } else {
+            fprintf(stderr, "Failed to remove user '%s' from room '%s': %s\n", cli->name, cli->current_room, sqlite3_errmsg(db));
+        }
+        pthread_mutex_unlock(&db_mutex);
     }
 
     close(cli->sockfd);
