@@ -107,19 +107,20 @@ void send_msg_handler() {
         if (strcmp(message, "/help") == 0) {
             printf("Available commands:\n");
             printf("  /create <room> <user1> <user2> ... : Create private room\n");
-            printf("  /join <room>                     : Send request to join a private room\n");
-            printf("  /accept <room> <user>            : Accept a user's join request (room creator only)\n");
-            printf("  /reject <room> <user>            : Reject a user's join request (room creator only)\n");
-            printf("  /kick <room> <user>              : Kick a user from the room (room creator only)\n");
-            printf("  /leave                           : Leave current room\n");
-            printf("  /rooms                           : List available rooms\n");
-            printf("  /online                          : List online users\n");
-            printf("  exit                             : Quit chat\n");
+            printf("  /delete <room>                     : Delete a private room (room creator only)\n");
+            printf("  /join <room>                       : Send request to join a private room\n");
+            printf("  /accept <room> <user>              : Accept a user's join request (room creator only)\n");
+            printf("  /reject <room> <user>              : Reject a user's join request (room creator only)\n");
+            printf("  /kick <room> <user>                : Kick a user from the room (room creator only)\n");
+            printf("  /leave                             : Leave current room\n");
+            printf("  /rooms                             : List available rooms\n");
+            printf("  /online                            : List online users\n");
+            printf("  exit                               : Quit chat\n");
             printf("Formatting:\n");
-            printf("  *text*                           : Bold text\n");
-            printf("  _text_                           : Italic text\n");
-            printf("  :smile:                          : Smile emoji 😊\n");
-            printf("  :heart:                          : Heart emoji ❤️\n");
+            printf("  *text*                             : Bold text\n");
+            printf("  _text_                             : Italic text\n");
+            printf("  :smile:                            : Smile emoji 😊\n");
+            printf("  :heart:                            : Heart emoji ❤️\n");
             continue;
         }
 
