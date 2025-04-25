@@ -9,12 +9,12 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 
-#define LENGTH 2048
+#define LENGTH 2048 
 
-volatile sig_atomic_t flag = 0;
-int sockfd = 0;
-char name[32];
-int is_blocked = 0;
+volatile sig_atomic_t flag = 0;  
+int sockfd = 0;                  // Socket kết nối
+char name[32];                  
+int is_blocked = 0;             
 
 void str_trim_lf(char* arr, int length) {
     for (int i = 0; i < length; i++) {
@@ -44,20 +44,22 @@ void format_message(char *input, char *output, int max_len) {
     while (*pos && out_len < max_len - 10) {
         if (*pos == '*' && *(pos + 1) != '*' && *(pos + 1) != '\0') {
             if (strncmp(pos, "*text*", 6) != 0) {
-                strcpy(out + out_len, "\033[1m");
+                strcpy(out + out_len, "\033[1m"); // Bắt đầu in đậm
                 out_len += strlen("\033[1m");
                 pos++;
                 while (*pos != '*' && *pos && out_len < max_len - 10) {
                     out[out_len++] = *pos++;
                 }
                 if (*pos == '*') {
-                    strcpy(out + out_len, "\033[0m");
+                    strcpy(out + out_len, "\033[0m"); // Kết thúc in đậm
                     out_len += strlen("\033[0m");
                     pos++;
                 }
                 continue;
             }
-        } else if (*pos == '_' && *(pos + 1) != '_' && *(pos + 1) != '\0') {
+        }
+        // Định dạng in nghiêng: _text_
+        else if (*pos == '_' && *(pos + 1) != '_' && *(pos + 1) != '\0') {
             strcpy(out + out_len, "\033[3m");
             out_len += strlen("\033[3m");
             pos++;
@@ -70,17 +72,22 @@ void format_message(char *input, char *output, int max_len) {
                 pos++;
             }
             continue;
-        } else if (*pos == ':' && strncmp(pos, ":smile:", 7) == 0) {
+        }
+        // Emoji :smile:
+        else if (*pos == ':' && strncmp(pos, ":smile:", 7) == 0) {
             strcpy(out + out_len, "😊");
             out_len += strlen("😊");
             pos += 7;
             continue;
-        } else if (*pos == ':' && strncmp(pos, ":heart:", 7) == 0) {
+        }
+        // Emoji :heart:
+        else if (*pos == ':' && strncmp(pos, ":heart:", 7) == 0) {
             strcpy(out + out_len, "❤️");
             out_len += strlen("❤️");
             pos += 7;
             continue;
         }
+
         out[out_len++] = *pos++;
     }
     out[out_len] = '\0';
@@ -91,12 +98,13 @@ void send_msg_handler() {
     char buffer[LENGTH + 32] = {};
 
     while (1) {
+
         if (is_blocked) {
             usleep(100000);
             continue;
         }
 
-        str_overwrite_stdout();
+        str_overwrite_stdout();  // In dấu nhắc nhập
         fgets(message, LENGTH, stdin);
         str_trim_lf(message, LENGTH);
 
@@ -124,6 +132,7 @@ void send_msg_handler() {
             continue;
         }
 
+        // Gửi tin nhắn tới server
         snprintf(buffer, sizeof(buffer), "%s", message);
         send(sockfd, buffer, strlen(buffer), 0);
 
@@ -136,9 +145,9 @@ void send_msg_handler() {
 
 void recv_msg_handler() {
     char message[LENGTH] = {};
-
     char formatted_message[LENGTH + 100] = {};
-    FILE *log_file = fopen("client_log.txt", "a");
+    FILE *log_file = fopen("client_log.txt", "a"); // Ghi log vào file
+
     if (!log_file) {
         perror("Failed to open client_log.txt");
     }
@@ -148,6 +157,7 @@ void recv_msg_handler() {
         if (receive > 0) {
             message[receive] = '\0';
 
+            // Ghi log vào file
             if (log_file) {
                 fprintf(log_file, "Received: %s", message);
                 fflush(log_file);
@@ -155,11 +165,12 @@ void recv_msg_handler() {
 
             if (strstr(message, "Spam detected")) {
                 is_blocked = 1;
-                printf("\033[1;31m%s\033[0m", message);
+                printf("\033[1;31m%s\033[0m", message);  // In ra màu đỏ
             } else if (strstr(message, "no longer blocked")) {
                 is_blocked = 0;
-                printf("\033[1;32m%s\033[0m", message);
+                printf("\033[1;32m%s\033[0m", message);  // In ra màu xanh
             } else {
+                // In ra tin nhắn đã định dạng
                 format_message(message, formatted_message, LENGTH + 100);
                 printf("%s", formatted_message);
             }
@@ -176,6 +187,7 @@ void recv_msg_handler() {
 }
 
 int main(int argc, char **argv) {
+
     if (argc != 3) {
         printf("Usage: %s <server_ip> <port>\n", argv[0]);
         return EXIT_FAILURE;
@@ -184,7 +196,7 @@ int main(int argc, char **argv) {
     char *ip = argv[1];
     int port = atoi(argv[2]);
 
-    signal(SIGINT, catch_ctrl_c_and_exit);
+    signal(SIGINT, catch_ctrl_c_and_exit); 
 
     char action[10];
     int choice = 0;
@@ -212,22 +224,26 @@ int main(int argc, char **argv) {
     fgets(password, 32, stdin);
     str_trim_lf(password, 32);
 
+    // Tạo socket và thiết lập địa chỉ server
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = inet_addr(ip);
     server_addr.sin_port = htons(port);
 
+    // Kết nối tới server
     int err = connect(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr));
     if (err == -1) {
         perror("ERROR: connect");
         return EXIT_FAILURE;
     }
 
+    // Gửi thông tin xác thực (login/register)
     char auth_message[100];
     snprintf(auth_message, sizeof(auth_message), "%s|%s|%s", action, name, password);
     send(sockfd, auth_message, strlen(auth_message), 0);
 
+    // Nhận phản hồi xác thực
     char auth_response[LENGTH];
     int bytes = recv(sockfd, auth_response, sizeof(auth_response) - 1, 0);
     if (bytes <= 0) {
@@ -238,6 +254,7 @@ int main(int argc, char **argv) {
 
     auth_response[bytes] = '\0';
 
+    // In ra phản hồi xác thực
     char *newline = strchr(auth_response, '\n');
     if (newline) {
         *newline = '\0';
@@ -255,6 +272,7 @@ int main(int argc, char **argv) {
     printf("=== WELCOME TO THE CHATROOM ===\n");
     printf("Type /help to see available commands.\n");
 
+    // Tạo thread gửi và nhận tin nhắn
     pthread_t send_msg_thread;
     if (pthread_create(&send_msg_thread, NULL, (void *) send_msg_handler, NULL) != 0) {
         printf("ERROR: pthread\n");
@@ -267,6 +285,7 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
+    // Đợi tín hiệu kết thúc
     while (1) {
         if (flag) {
             printf("\nBye\n");
