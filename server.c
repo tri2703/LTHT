@@ -93,7 +93,7 @@ int register_user(const char* username, const char* password) {
     if (sqlite3_step(stmt) == SQLITE_ROW) {
         sqlite3_finalize(stmt);
         pthread_mutex_unlock(&db_mutex);
-        return 0;
+        return 0; //Username đã tồn tại
     }
     sqlite3_finalize(stmt);
 
@@ -163,6 +163,7 @@ void send_message_to_room(const char *room_name, const char *msg, int exclude_ui
     pthread_mutex_unlock(&clients_mutex);
 }
 
+//Gửi danh sách user đang online đến client yêu cầu
 void send_online_users(int sockfd) {
     client_t *requesting_client = NULL;
     pthread_mutex_lock(&clients_mutex);
@@ -210,6 +211,7 @@ void broadcast_status(char *msg) {
     pthread_mutex_unlock(&clients_mutex);
 }
 
+//Thông báo cho người tạo phòng về yêu cầu tham gia private room
 void notify_room_members(const char *room_name, const char *username) {
     char sql[BUFFER_SZ];
     snprintf(sql, sizeof(sql), "SELECT created_by FROM rooms WHERE name = ?;");
@@ -1409,6 +1411,7 @@ void *handle_client(void *arg) {
                 continue;
             }
 
+            //Hiển thị danh sách phòng và trạng thái thành viên cho client yêu cầu
             if (strcmp(buff_out, "/rooms") == 0) {
                 char room_list[BUFFER_SZ] = "[Server] Room Information:\n";
                 int has_rooms = 0;
